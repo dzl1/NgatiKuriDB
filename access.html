@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f3f3f3">
+  <title>BMSData — Access-style view</title>
+  <link rel="stylesheet" href="access.css">
+  <style>.ribbon-hidden{display:none}</style>
+</head>
+<body>
+  <header class="access-titlebar">
+    <a class="access-appmark" href="index.html" aria-label="Back to Harbour">H</a>
+    <div class="quick-tools"><button title="Save">▣</button><button title="Undo">↶</button><button title="Redo">↷</button><span class="quick-divider"></span><span class="app-name">Access</span></div>
+    <div class="database-title"><strong id="accessFileName">BMSData.accdb</strong><span>— Access-style local viewer</span></div>
+    <div class="title-actions"><span class="local-badge"><i></i> LOCAL FILE</span><a href="users.html">People</a><a href="relationships.html">Relationships</a><a href="index.html">Harbour view ↗</a></div>
+  </header>
+
+  <nav class="ribbon-tabs" aria-label="Ribbon tabs">
+    <button class="ribbon-tab file-tab">File</button><button class="ribbon-tab active" data-ribbon="home">Home</button><button class="ribbon-tab" data-ribbon="create">Create</button><button class="ribbon-tab" data-ribbon="external">External Data</button><button class="ribbon-tab" data-ribbon="tools">Database Tools</button>
+    <div class="ribbon-context">TABLE TOOLS <span>▾</span></div><button class="ribbon-tab contextual" data-ribbon="table">Fields</button>
+    <div class="ribbon-spacer"></div><button class="ribbon-collapse" title="Collapse ribbon">⌃</button>
+  </nav>
+
+  <section class="ribbon" id="ribbonHome">
+    <div class="ribbon-group"><div class="ribbon-command-row"><button class="big-command" id="exportCurrent"><span class="command-icon export-icon">▤<i>↓</i></span><span>Export<br>to Excel</span></button><button class="big-command" id="refreshButton"><span class="command-icon">⟳</span><span>Refresh<br>All</span></button></div><small>Records</small></div>
+    <div class="ribbon-group"><div class="ribbon-command-row"><button class="big-command disabled-command" title="This is a read-only viewer"><span class="command-icon">＋</span><span>New<br>Record</span></button><button class="big-command disabled-command" title="This is a read-only viewer"><span class="command-icon">⌫</span><span>Delete</span></button></div><small>Records <span class="group-menu">⌄</span></small></div>
+    <div class="ribbon-group sort-group"><div class="ribbon-command-row"><button class="small-command" id="sortAsc"><span>↥</span> Sort A to Z</button><button class="small-command" id="sortDesc"><span>↧</span> Sort Z to A</button></div><small>Sort &amp; Filter</small></div>
+    <div class="ribbon-group"><div class="ribbon-command-row"><label class="find-box">Find <input id="findInput" placeholder="Search this table"></label><button class="small-command clear-find" id="clearFind">× Clear</button></div><small>Find</small></div>
+    <div class="ribbon-message" id="ribbonMessage">Read-only preview of the tables in your database.</div>
+  </section>
+
+  <main class="access-workspace">
+    <aside class="navigation-pane" id="navigationPane">
+      <div class="pane-heading"><strong>All Access Objects</strong><button id="collapseNav" title="Collapse navigation pane">‹</button></div>
+      <div class="nav-search"><span>⌕</span><input id="tableSearch" placeholder="Search objects…"><button id="clearTableSearch" aria-label="Clear">×</button></div>
+      <div class="object-group"><button class="object-group-title"><span class="chevron">⌄</span><span class="object-type-icon">▤</span> Tables <span class="object-count" id="objectCount"></span></button><div id="objectList" class="object-list"></div></div>
+      <div class="pane-note"><span>ⓘ</span> Queries, forms and reports are not rendered by this browser viewer. This pane lists the database tables.</div>
+      <div class="pane-footer"><span class="tiny-lock">◈</span> Read-only · processed locally</div>
+    </aside>
+
+    <section class="datasheet-area">
+      <div class="object-tabs" id="objectTabs"><div class="object-tab-placeholder">No table selected</div></div>
+      <div class="datasheet-toolbar"><div class="datasheet-title"><span class="datasheet-table-icon">▦</span><strong id="currentTableTitle">Open a table</strong><span class="datasheet-subtitle" id="tableSubtitle"></span></div><div class="view-controls"><span>View</span><button class="view-button active" title="Datasheet view">▦</button><button class="view-button" title="Design view unavailable">⚒</button></div></div>
+      <div class="datasheet-scroll" id="datasheetScroll"><table class="access-grid" id="accessGrid"><thead></thead><tbody></tbody></table><div class="access-loading" id="emptyMessage"><span class="empty-grid-icon">▦</span><strong id="emptyTitle">Open a table to view its records</strong><small id="emptyHint">Choose a table in the navigation pane.</small></div></div>
+      <div class="record-bar"><div class="record-nav"><button id="firstPage" title="First records">|◀</button><button id="previousPage" title="Previous records">◀</button><span id="recordPosition">Record 0 of 0</span><button id="nextPage" title="Next records">▶</button><button id="lastPage" title="Last records">▶|</button><button id="newRecord" class="new-record" title="Read-only">✳</button><input id="recordJump" aria-label="Go to record" value="1"><span>of <b id="recordTotal">0</b></span></div><div class="record-filter" id="filterStatus">No Filter</div><div class="record-search"><label for="recordSearch">Search</label><input id="recordSearch"><button id="clearRecordSearch">×</button></div></div>
+      <footer class="access-statusbar"><span id="statusMessage">Ready</span><span class="status-right"><i></i> Local database <b>▦</b> Datasheet View</span></footer>
+    </section>
+  </main>
+
+  <script type="module" src="access.js"></script>
+</body>
+</html>

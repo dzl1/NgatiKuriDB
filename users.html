@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f7f6f2">
+  <title>Harbour — People and related records</title>
+  <link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="users.css">
+  <style>.profile-fields[hidden]{display:none}</style>
+</head>
+<body class="users-page">
+  <header class="topbar users-topbar"><div class="breadcrumbs"><a href="index.html">Workspace</a><b>/</b><strong>People and records</strong></div><div class="top-actions"><a class="access-view-link" href="relationships.html">⇄ Relationships</a><a class="access-view-link" href="access.html">▦ Access-style view</a><span class="privacy"><i></i> Database stays on this device</span></div></header>
+  <main class="users-content">
+    <section class="users-heading"><div><div class="eyebrow"><span class="eyebrow-dot"></span>UNIFIED PEOPLE VIEW</div><h1>Records by person.</h1><p>Choose a person to see matching records gathered across the database tables.</p></div><a href="index.html" class="back-link">← All tables</a></section>
+    <div id="loadStatus" class="users-load-status">Reading BMSData.accdb…</div>
+    <div class="people-workspace">
+      <aside class="people-sidebar">
+        <div class="entity-controls"><label for="entityTable">PEOPLE TABLE</label><select id="entityTable" disabled><option>Loading…</option></select><label for="keyField">PERSON KEY</label><select id="keyField" disabled><option>Choose a table first</option></select></div>
+        <div class="people-search"><span>⌕</span><input id="peopleSearch" placeholder="Find a person…"><span class="people-total" id="peopleTotal">—</span></div>
+        <div id="peopleList" class="people-list"></div>
+        <div class="people-sidebar-foot"><span>◈</span> Read-only · local database</div>
+      </aside>
+      <section class="person-detail" id="personDetail"><div class="person-empty"><span>♙</span><strong>Select a person</strong><small>Choose someone from the list to gather their related records.</small></div></section>
+    </div>
+    <div class="people-note"><span>ⓘ</span><p>This page matches a person key to fields in other tables. It can only include records that contain a matching key; indirect links and ambiguous IDs may need review in the <a href="relationships.html">relationship map</a>.</p></div>
+    <footer class="page-footer"><span>Harbour reads the database locally in your browser.</span><span>HARBOUR <b>·</b> PEOPLE VIEW</span></footer>
+  </main>
+  <script type="module" src="users.js"></script>
+</body>
+</html>
