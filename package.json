@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "python3 server.py"
+    "dev": "node server.js"
   }
 }

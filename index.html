@@ -4,47 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#f7f6f2">
-  <title>Harbour — Access database viewer</title>
-  <link rel="stylesheet" href="styles.css">
-  <style>.access-view-link{border:1px solid #d9ded7;border-radius:5px;padding:6px 9px;text-decoration:none;color:#42634a;font-size:11px}.access-view-link:hover{background:#edf2ec}.access-view-link span{margin-left:4px;color:#9b785c}@media(max-width:580px){.access-view-link{font-size:0}.access-view-link:first-letter{font-size:13px}}</style>
+  <meta http-equiv="refresh" content="0; url=users.html">
+  <title>Harbour — Database Entries</title>
 </head>
 <body>
-  <div class="app-shell">
-    <aside class="rail">
-      <a class="brand" href="#" aria-label="Harbour home"><span class="brand-mark">H</span><span>harbour</span></a>
-      <div class="rail-label">WORKSPACE</div>
-      <button class="rail-item active"><span class="rail-icon">▦</span>Database viewer</button>
-      <div class="rail-bottom"><div class="avatar">NK</div><div><strong>Local workspace</strong><small>Private on this device</small></div><span class="more">···</span></div>
-    </aside>
-
-    <main class="main">
-      <header class="topbar"><div class="breadcrumbs"><span>Workspace</span><b>/</b><strong>Database viewer</strong></div><div class="top-actions"><a class="access-view-link" href="users.html">♙ People</a><a class="access-view-link" href="relationships.html">⇄ Relationships</a><a class="access-view-link" href="access.html">▦ Access-style view <span>↗</span></a><span class="privacy"><i></i> Files stay on your device</span><button class="help-button" id="helpButton" aria-label="Help">?</button></div></header>
-
-      <div class="content">
-        <section class="intro"><div><div class="eyebrow"><span class="eyebrow-dot"></span>YOUR DATA, MADE ACCESSIBLE</div><h1>Open your database.</h1><p>Explore tables from your local Access database and export the data you need.</p></div><div class="intro-art" aria-hidden="true"><div class="art-orbit orbit-one"></div><div class="art-orbit orbit-two"></div><div class="art-card"><div class="art-card-top"><span></span><span></span><span></span></div><div class="art-lines"><i></i><i></i><i></i></div><div class="art-grid"><i></i><i></i><i></i><i></i><i></i><i></i></div></div><span class="art-spark">✳</span></div></section>
-
-        <section id="uploadView" class="upload-section">
-          <div class="section-heading"><div><h2>Database source</h2><p>Harbour reads this file directly from the project folder.</p></div><span class="step-label">LOCAL <i>—</i> DATA</span></div>
-          <div class="dropzone source-card" aria-label="Database file in project data folder">
-            <div class="upload-icon"><span class="database-glyph">▤</span></div>
-            <div class="drop-copy"><strong>BMSData.accdb</strong><span>data/BMSData.accdb · stays on this device</span></div>
-            <span class="file-types"><b>ACCDB</b><span>READ ONLY</span></span>
-          </div>
-          <div id="status" class="status" role="status" aria-live="polite"></div>
-          <div class="upload-foot"><span><span class="lock">⌑</span> The database is read in your browser</span><button class="learn-link" id="howButton">How it works <span>↗</span></button></div>
-          <div class="capabilities"><div><span class="cap-icon table-icon">▤</span><span><strong>Browse every table</strong><small>See fields and records at a glance</small></span></div><div><span class="cap-icon sheet-icon">▦</span><span><strong>Export your way</strong><small>Download all data or just what you need</small></span></div><div><span class="cap-icon shield-icon">◈</span><span><strong>Private by design</strong><small>Everything stays on your device</small></span></div></div>
-        </section>
-
-        <section id="databaseView" class="database-view hidden">
-          <div class="db-heading"><div><div class="eyebrow"><span class="eyebrow-dot"></span>DATABASE READY</div><h2 id="dbName">Database</h2><p id="dbMeta">Tables loaded locally</p></div></div>
-          <div class="data-layout"><aside class="table-sidebar"><div class="sidebar-title">TABLES <span id="tableCount"></span></div><div id="tableList" class="table-list"></div></aside><div class="table-panel"><div class="table-toolbar"><div><h3 id="tableTitle">Select a table</h3><span id="recordCount"></span></div><button id="exportButton" class="export-button" disabled><span>↓</span> Export table</button></div><div id="fieldBar" class="field-bar"></div><div id="tableContent" class="table-content"><div class="empty-state"><span>▤</span><strong>Your tables will appear here</strong><small>Select a table from the list to view its records.</small></div></div><div id="tableFooter" class="table-footer hidden"></div></div></div>
-        </section>
-
-        <footer class="page-footer"><span>Made for making old data useful again.</span><span>HARBOUR <b>·</b> LOCAL DATA TOOLS</span></footer>
-      </div>
-    </main>
-  </div>
-  <dialog id="infoDialog"><button class="dialog-close" id="closeDialog" aria-label="Close">×</button><div class="eyebrow"><span class="eyebrow-dot"></span>HOW IT WORKS</div><h2>Simple, private, and local.</h2><p>Harbour reads <b>data/BMSData.accdb</b> in your browser. The database file is served from this computer and is not uploaded to a remote service.</p><ol><li>Keep the database in the project’s <b>data</b> folder.</li><li>Pick a table to preview its fields and records.</li><li>Export the full table or choose specific fields. Downloads are CSV files that open in spreadsheet apps.</li></ol><p class="dialog-note">The Access reader library is loaded from a CDN, so an internet connection is needed to open the app. Database contents stay in your browser.</p></dialog>
-  <script type="module" src="app.js"></script>
+  <p>Opening <a href="users.html">Database Entries · List All</a>…</p>
 </body>
 </html>
