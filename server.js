@@ -26,6 +26,8 @@ app.use((request, response, next) => {
     'X-Content-Type-Options': 'nosniff',
     'Referrer-Policy': 'same-origin',
     'X-Frame-Options': 'DENY',
+    // Ask search engines and AI crawlers not to index, cache, snippet or train on anything here.
+    'X-Robots-Tag': 'noindex, nofollow, noarchive, nosnippet, noimageindex, noai, noimageai',
   });
   if (request.path.startsWith('/api/')) response.set('Cache-Control', 'no-store');
   next();
@@ -41,6 +43,17 @@ app.use('/api', (request, response, next) => {
   return next();
 });
 app.use('/api', express.json({ limit: '20kb' }));
+
+// Public: tells every crawler, including AI crawlers, to stay out of the whole site.
+// Polite crawlers obey it; the real protection is that everything else needs a staff sign-in.
+const AI_CRAWLERS = [
+  'GPTBot', 'ChatGPT-User', 'OAI-SearchBot', 'ClaudeBot', 'Claude-User', 'Claude-SearchBot', 'anthropic-ai',
+  'Google-Extended', 'GoogleOther', 'Applebot-Extended', 'PerplexityBot', 'Perplexity-User', 'CCBot',
+  'Bytespider', 'Amazonbot', 'meta-externalagent', 'FacebookBot', 'cohere-ai', 'Diffbot', 'YouBot',
+  'Timpibot', 'ImagesiftBot', 'omgili', 'DuckAssistBot', 'MistralAI-User',
+];
+const ROBOTS_TXT = [...AI_CRAWLERS, '*'].map((agent) => `User-agent: ${agent}\nDisallow: /\n`).join('\n');
+app.get('/robots.txt', (request, response) => response.type('text').send(ROBOTS_TXT));
 
 // Unauthenticated liveness check for App Service.
 app.get('/healthz', (request, response) => response.type('text').send('ok'));
