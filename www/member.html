@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+  <meta charset="utf-8">
+  <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noai, noimageai">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#032306">
+  <title>My registration · Ngāti Kuri</title>
+  <link rel="icon" href="assets/ngatikuri-logo.png">
+  <link rel="preload" href="fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/Pingao-Regular.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="site.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="/"><img src="assets/ngatikuri-logo.png" alt="Ngāti Kuri"><span>Ngāti Kuri Iwi Register</span></a>
+      <nav class="site-nav" aria-label="Main">
+        <a href="/">Home</a>
+        <a href="/#contact">Contact</a>
+        <a id="signOut" href="/.auth/logout?post_logout_redirect_uri=/" hidden>Sign out</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="portal">
+    <div class="wrap">
+      <div class="portal-bar">
+        <h1 id="title">My registration</h1>
+        <small id="signedInAs"></small>
+      </div>
+      <p class="lead" id="lead">Loading…</p>
+      <div id="message" class="notice" role="status" aria-live="polite"></div>
+      <div id="content"></div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <span>© Ngāti Kuri Trust Board Incorporated</span>
+      <a href="/#privacy">How we use your information</a>
+    </div>
+  </footer>
+  <script type="module" src="member.js"></script>
+</body>
+</html>

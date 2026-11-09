@@ -16,6 +16,18 @@ param sqlAdminObjectId string
 @description('Client ID of the Entra app registration used for staff sign-in. Leave empty on the first deployment.')
 param authClientId string = ''
 
+@description('Client ID of the member sign-in app registration in the External ID tenant. Leave empty until it exists.')
+param memberAuthClientId string = ''
+
+@description('Tenant ID of the External ID (members) tenant.')
+param memberTenantId string = ''
+
+@description('Subdomain of the External ID tenant (<name>.ciamlogin.com).')
+param memberTenantName string = 'ngatikurimembers'
+
+@description('Object ID of the person who manages secrets (gets Key Vault Secrets Officer).')
+param keyVaultAdminObjectId string = sqlAdminObjectId
+
 @description('Refuse staff sessions that did not use multi-factor authentication. Turn on once MFA is enforced in the tenant.')
 param requireStaffMfa bool = false
 
@@ -34,6 +46,39 @@ var databaseName = 'harbour'
 var webAppName = '${prefix}-harbour-${suffix}'
 var tenantId = subscription().tenantId
 var tags = { project: 'ngatikuri-db' }
+var keyVaultName = '${prefix}-kv-${suffix}'
+var memberSecretName = 'members-client-secret'
+
+// Secrets (the member sign-in client secret). RBAC only; the web app reads with its managed identity.
+resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
+  name: keyVaultName
+  location: location
+  tags: tags
+  properties: {
+    tenantId: tenantId
+    sku: { family: 'A', name: 'standard' }
+    enableRbacAuthorization: true
+    enableSoftDelete: true
+    softDeleteRetentionInDays: 30
+    enablePurgeProtection: true
+    publicNetworkAccess: 'Enabled'
+  }
+}
+
+var keyVaultSecretsUser = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
+var keyVaultSecretsOfficer = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7')
+
+resource webAppSecretsAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: keyVault
+  name: guid(keyVault.id, webApp.id, keyVaultSecretsUser)
+  properties: { roleDefinitionId: keyVaultSecretsUser, principalId: webApp.identity.principalId, principalType: 'ServicePrincipal' }
+}
+
+resource adminSecretsAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: keyVault
+  name: guid(keyVault.id, keyVaultAdminObjectId, keyVaultSecretsOfficer)
+  properties: { roleDefinitionId: keyVaultSecretsOfficer, principalId: keyVaultAdminObjectId, principalType: 'User' }
+}
 
 resource sqlServer 'Microsoft.Sql/servers@2023-08-01' = {
   name: sqlServerName
@@ -107,6 +152,7 @@ resource webApp 'Microsoft.Web/sites@2024-04-01' = {
         { name: 'NODE_ENV', value: 'production' }
         { name: 'WEB_URL', value: 'https://${prefix}-harbour-${suffix}.azurewebsites.net' }
         { name: 'REQUIRE_STAFF_MFA', value: string(requireStaffMfa) }
+        { name: 'MEMBERS_CLIENT_SECRET', value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=${memberSecretName})' }
         { name: 'SCM_DO_BUILD_DURING_DEPLOYMENT', value: 'true' }
       ]
     }
@@ -132,6 +178,24 @@ resource auth 'Microsoft.Web/sites/config@2024-04-01' = if (!empty(authClientId)
     }
     httpSettings: { requireHttps: true }
     identityProviders: {
+      // Members: Microsoft Entra External ID, signed in at /.auth/login/members
+      customOpenIdConnectProviders: empty(memberAuthClientId) ? {} : {
+        members: {
+          enabled: true
+          registration: {
+            clientId: memberAuthClientId
+            clientCredential: { clientSecretSettingName: 'MEMBERS_CLIENT_SECRET' }
+            openIdConnectConfiguration: {
+              wellKnownOpenIdConfiguration: 'https://${memberTenantName}.ciamlogin.com/${memberTenantId}/v2.0/.well-known/openid-configuration'
+            }
+          }
+          login: {
+            nameClaimType: 'name'
+            scopes: [ 'openid', 'profile', 'email' ]
+          }
+        }
+      }
+      // Staff: Microsoft Entra ID (the organisation's tenant), signed in at /.auth/login/aad
       azureActiveDirectory: {
         enabled: true
         registration: {
@@ -170,3 +234,4 @@ output webAppPrincipalId string = webApp.identity.principalId
 output sqlServerName string = sqlServer.name
 output sqlServerFqdn string = sqlServer.properties.fullyQualifiedDomainName
 output databaseName string = databaseName
+output keyVaultName string = keyVault.name

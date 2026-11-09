@@ -12,6 +12,8 @@
 # 6. Deploys the app.
 #
 # Optional: BUDGET_EMAILS="a@x.org,b@x.org" sets up monthly budget alerts (MONTHLY_BUDGET, default 40 USD).
+# Optional: MEMBER_TENANT_ID=<External ID tenant id> also configures member sign-in
+#           (scripts/setup-member-signin.js) and turns it on in App Service Authentication.
 set -euo pipefail
 
 RESOURCE_GROUP="${RESOURCE_GROUP:-ngatikuri-rg}"
@@ -19,6 +21,8 @@ LOCATION="${LOCATION:-newzealandnorth}"
 APP_DISPLAY_NAME="${APP_DISPLAY_NAME:-Ngati Kuri Harbour}"
 BUDGET_EMAILS="${BUDGET_EMAILS:-}"
 MONTHLY_BUDGET="${MONTHLY_BUDGET:-40}"
+MEMBER_TENANT_ID="${MEMBER_TENANT_ID:-}"
+MEMBER_CLIENT_ID=""
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
@@ -36,6 +40,7 @@ deploy_infra() {
   az deployment group create -g "$RESOURCE_GROUP" -n harbour-infra -f infra/main.bicep \
     -p sqlAdminLogin="$ADMIN_UPN" sqlAdminObjectId="$ADMIN_OID" authClientId="${1:-}" \
        budgetEmails="$BUDGET_JSON" monthlyBudget="$MONTHLY_BUDGET" \
+       memberTenantId="$MEMBER_TENANT_ID" memberAuthClientId="$MEMBER_CLIENT_ID" \
     --query properties.outputs -o json
 }
 
@@ -74,6 +79,12 @@ done
 
 say "Turning on App Service Authentication"
 deploy_infra "$APP_ID" > /dev/null
+
+if [ -n "$MEMBER_TENANT_ID" ]; then
+  say "Member sign-in (External ID tenant $MEMBER_TENANT_ID)"
+  MEMBER_CLIENT_ID="$(node scripts/setup-member-signin.js "$MEMBER_TENANT_ID" "$WEB_URL" "$(out keyVaultName)" | tee /dev/stderr | sed -n 's/^memberAuthClientId=//p')"
+  deploy_infra "$APP_ID" > /dev/null
+fi
 
 say "Opening the SQL firewall to this computer for the migration"
 MY_IP="$(curl -fsS https://api.ipify.org)"

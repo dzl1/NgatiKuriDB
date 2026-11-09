@@ -11,7 +11,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PACKAGE="$(mktemp -d)/harbour.zip"
 
 cd "$ROOT"
-zip -qr "$PACKAGE" package.json package-lock.json server.js src public -x '*.DS_Store'
+zip -qr "$PACKAGE" package.json package-lock.json server.js src public www -x '*.DS_Store'
 if unzip -l "$PACKAGE" | grep -qiE '\.(accdb|accde|mdb)$'; then
   echo "Refusing to deploy: the package contains a database file." >&2
   exit 1

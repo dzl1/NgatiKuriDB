@@ -2,9 +2,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import compression from 'compression';
 import express from 'express';
-import { audit, forgetStaff, getUser, onAppService, requireRole, ROLES } from './src/auth.js';
+import { audit, forgetStaff, getMemberIdentity, getUser, memberLoginUrl, onAppService, requireRole, ROLES } from './src/auth.js';
 import { getPool, sql, sqlConfigured } from './src/db.js';
 import { inviteToTenant } from './src/graph.js';
+import * as members from './src/members.js';
 import { snapshotFromAccdb, snapshotFromSql } from './src/snapshot.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -37,7 +38,8 @@ app.use((request, response, next) => {
 // cross-site form or link cannot.
 app.use('/api', (request, response, next) => {
   if (['GET', 'HEAD'].includes(request.method)) return next();
-  if (request.get('x-harbour') !== '1' || !request.is('application/json')) {
+  const hasBody = Number(request.get('content-length') || 0) > 0 || Boolean(request.get('transfer-encoding'));
+  if (request.get('x-harbour') !== '1' || (hasBody && !request.is('application/json'))) {
     return response.status(403).json({ error: 'Request refused.' });
   }
   return next();
@@ -54,6 +56,26 @@ const AI_CRAWLERS = [
 ];
 const ROBOTS_TXT = [...AI_CRAWLERS, '*'].map((agent) => `User-agent: ${agent}\nDisallow: /\n`).join('\n');
 app.get('/robots.txt', (request, response) => response.type('text').send(ROBOTS_TXT));
+
+// Local development only: switch between pretending to be staff, a member, or nobody.
+if (!onAppService) {
+  app.get('/dev/as', (request, response) => {
+    const who = ['staff', 'member', 'none'].includes(request.query.who) ? request.query.who : 'staff';
+    response.cookie('harbour_dev_as', who, { httpOnly: true, sameSite: 'lax' });
+    response.redirect(who === 'member' ? '/member.html' : who === 'staff' ? '/users.html' : '/');
+  });
+  // Stand-ins for App Service Authentication's sign-in URLs.
+  app.get('/.auth/login/:provider', (request, response) => {
+    const who = request.params.provider === 'members' ? 'member' : 'staff';
+    response.cookie('harbour_dev_as', who, { httpOnly: true, sameSite: 'lax' });
+    const target = String(request.query.post_login_redirect_uri || '/');
+    response.redirect(target.startsWith('/') && !target.startsWith('//') ? target : '/');
+  });
+  app.get('/.auth/logout', (request, response) => {
+    response.cookie('harbour_dev_as', 'none', { httpOnly: true, sameSite: 'lax' });
+    response.redirect('/');
+  });
+}
 
 // Unauthenticated liveness check for App Service.
 app.get('/healthz', (request, response) => response.type('text').send('ok'));
@@ -91,6 +113,48 @@ app.get('/api/staff/snapshot', requireRole('Viewer'), async (request, response, 
   } catch (error) {
     next(error);
   }
+});
+
+// ---- Members (External ID sign-in) ----
+
+function requireMember(request, response, next) {
+  const identity = getMemberIdentity(request);
+  if (!identity) return response.status(401).json({ error: 'Sign in required.', login: memberLoginUrl('/member.html') });
+  if (!useSql) return response.status(503).json({ error: 'Member accounts need Azure SQL.' });
+  request.member = identity;
+  return next();
+}
+
+app.get('/api/member/me', requireMember, async (request, response, next) => {
+  try { response.json(await members.memberState(request.member)); } catch (error) { next(error); }
+});
+app.post('/api/member/registration', requireMember, async (request, response, next) => {
+  try { await members.submitRegistration(request.member, request.body); response.status(201).json({ ok: true }); } catch (error) { next(error); }
+});
+app.post('/api/member/changes', requireMember, async (request, response, next) => {
+  try { await members.submitChange(request.member, request.body); response.status(201).json({ ok: true }); } catch (error) { next(error); }
+});
+app.post('/api/member/changes/:id/withdraw', requireMember, async (request, response, next) => {
+  try { await members.withdrawChange(request.member, Number(request.params.id)); response.json({ ok: true }); } catch (error) { next(error); }
+});
+
+// ---- Member requests (Approvers) ----
+
+app.get('/api/review', requireRole('Approver'), async (request, response, next) => {
+  if (needSql(response)) return;
+  try { response.json(await members.reviewQueue()); } catch (error) { next(error); }
+});
+app.get('/api/review/search', requireRole('Approver'), async (request, response, next) => {
+  if (needSql(response)) return;
+  try { response.json(await members.searchApplicants(request.query.q)); } catch (error) { next(error); }
+});
+app.post('/api/review/registrations/:id', requireRole('Approver'), async (request, response, next) => {
+  if (needSql(response)) return;
+  try { response.json(await members.decideRegistration(request.user, Number(request.params.id), request.body ?? {})); } catch (error) { next(error); }
+});
+app.post('/api/review/changes/:id', requireRole('Approver'), async (request, response, next) => {
+  if (needSql(response)) return;
+  try { await members.decideChange(request.user, Number(request.params.id), request.body ?? {}); response.json({ ok: true }); } catch (error) { next(error); }
 });
 
 // ---- Staff management (Admins) ----
@@ -225,13 +289,18 @@ function siteUrl(request) {
 
 // ---- Pages ----
 
-// The staff admin page needs the Admin role; every other page needs Viewer.
+// Public pages: the home page and the member portal (whose data needs a member sign-in).
+app.use(express.static(path.join(root, 'www'), { index: 'index.html' }));
+
+// Staff pages. Operators needs Admin, Member requests needs Approver, everything else Viewer.
 app.get('/admin.html', requireRole('Admin'));
-app.use(requireRole('Viewer'), express.static(path.join(root, 'public'), { index: 'index.html' }));
+app.get('/review.html', requireRole('Approver'));
+app.use(requireRole('Viewer'), express.static(path.join(root, 'public'), { index: false }));
 
 app.use((request, response) => response.status(404).type('text').send('Not found'));
 
 app.use((error, request, response, next) => {
+  if (error.expose && !response.headersSent) return response.status(error.status || 400).json({ error: error.message });
   console.error('[harbour]', error);
   if (response.headersSent) return next(error);
   let message = 'The server could not complete the request. Check the server log for details.';

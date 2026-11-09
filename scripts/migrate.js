@@ -17,7 +17,7 @@ import { getPool, sql } from '../src/db.js';
 import { includedColumns, listAccessTables, q, ROW_ORDER_COLUMN } from '../src/tables.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const accdbPath = path.resolve(process.argv[2] || path.join(root, 'data', 'BMSData.accdb'));
+const accdbPath = path.resolve(process.argv.slice(2).find((arg) => !arg.startsWith('--')) || path.join(root, 'data', 'BMSData.accdb'));
 
 // Access column type -> [DDL, mssql bulk type]
 function sqlType(column, maxTextLength) {
@@ -60,6 +60,16 @@ async function main() {
   console.log(`Connecting to ${process.env.SQL_SERVER} / ${process.env.SQL_DATABASE}…`);
   const pool = await getPool();
   await pool.request().batch(await fs.readFile(path.join(root, 'sql', 'app-schema.sql'), 'utf8'));
+
+  // Once the register has been edited in Azure (approved member changes, members added online),
+  // re-copying from Access would silently undo that work.
+  const edits = await pool.request().query(`
+    SELECT (SELECT COUNT(*) FROM app.ChangeRequests WHERE Status = 'approved')
+         + (SELECT COUNT(*) FROM app.MemberRegistrations WHERE Status = 'created') AS n`);
+  if (edits.recordset[0].n > 0 && !process.argv.includes('--force')) {
+    throw new Error(`The register has ${edits.recordset[0].n} change(s) made in Harbour (approved member changes or members added online). `
+      + 'Re-copying from Access would undo them. Run with --force only if you really want that.');
+  }
 
   const transaction = new sql.Transaction(pool);
   await transaction.begin();

@@ -27,11 +27,28 @@ const requireMfa = String(process.env.REQUIRE_STAFF_MFA).toLowerCase() === 'true
 const OBJECT_ID_CLAIMS = ['http://schemas.microsoft.com/identity/claims/objectidentifier', 'oid'];
 const AMR_CLAIMS = ['http://schemas.microsoft.com/claims/authnmethodsreferences', 'amr'];
 
-/** The signed-in identity from Entra, or null. Says nothing about Harbour access. */
-export function getIdentity(request) {
-  if (!onAppService) {
-    return { id: 'local-dev', name: process.env.DEV_USER || 'Local user', email: null, mfa: true, provider: 'local' };
+// Sign-in providers configured in App Service Authentication:
+//   aad     – staff, Microsoft Entra ID (the organisation's tenant)
+//   members – members, Microsoft Entra External ID (a separate customer tenant)
+// Staff access is only ever granted to 'aad' sign-ins and member access only to 'members'
+// sign-ins, so a member account can never act as staff, whatever its claims say.
+export const STAFF_PROVIDER = 'aad';
+export const MEMBER_PROVIDER = 'members';
+
+/** Local development only: which kind of user to pretend to be (cookie set by /dev/as). */
+function localDevIdentity(request) {
+  const as = /(?:^|;\s*)harbour_dev_as=(\w+)/.exec(request.get('cookie') || '')?.[1];
+  if (as === 'none') return null;
+  if (as === 'member') {
+    const email = process.env.DEV_MEMBER_EMAIL || 'member@example.org';
+    return { id: `local-member-${email}`, name: 'Local member', givenName: 'Local', familyName: 'Member', email, mfa: true, provider: MEMBER_PROVIDER };
   }
+  return { id: 'local-dev', name: process.env.DEV_USER || 'Local user', email: null, mfa: true, provider: STAFF_PROVIDER };
+}
+
+/** The signed-in identity, or null. Says nothing about Harbour access. */
+export function getIdentity(request) {
+  if (!onAppService) return localDevIdentity(request);
   if (String(process.env.WEBSITE_AUTH_ENABLED).toLowerCase() !== 'true') return null;
   const header = request.get('x-ms-client-principal');
   if (!header) return null;
@@ -45,13 +62,28 @@ export function getIdentity(request) {
   const claim = (...types) => claims.find((item) => types.includes(item.typ))?.val;
   const id = claim(...OBJECT_ID_CLAIMS);
   if (!id) return null;
+  const provider = principal.auth_typ;
+  const emailClaims = ['email', 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress'];
   return {
     id,
     name: claim('name') || request.get('x-ms-client-principal-name') || 'Signed-in user',
-    email: claim('preferred_username', 'email', 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress') || null,
+    givenName: claim('given_name', 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname') || null,
+    familyName: claim('family_name', 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname') || null,
+    // Staff: their sign-in name. Members: the email External ID verified at sign-up.
+    email: (provider === STAFF_PROVIDER ? claim('preferred_username', ...emailClaims) : claim(...emailClaims)) || null,
     mfa: claims.some((item) => AMR_CLAIMS.includes(item.typ) && item.val === 'mfa'),
-    provider: principal.auth_typ,
+    provider,
   };
+}
+
+/** The signed-in member (External ID), or null. */
+export function getMemberIdentity(request) {
+  const identity = getIdentity(request);
+  return identity?.provider === MEMBER_PROVIDER ? identity : null;
+}
+
+export function memberLoginUrl(returnTo) {
+  return `/.auth/login/${MEMBER_PROVIDER}?post_login_redirect_uri=${encodeURIComponent(returnTo || '/member.html')}`;
 }
 
 // Short cache so every page load and API call doesn't hit the database. Role changes and
@@ -68,7 +100,7 @@ export function forgetStaff(entraObjectId) {
  */
 export async function getUser(request) {
   const identity = getIdentity(request);
-  if (!identity) return null;
+  if (!identity || identity.provider !== STAFF_PROVIDER) return null;
 
   if (!onAppService || !sqlConfigured()) {
     const role = ROLES.includes(process.env.DEV_ROLE) ? process.env.DEV_ROLE : 'Admin';
@@ -120,7 +152,7 @@ async function recordSignIn(pool, staff, identity) {
 }
 
 export function loginUrl(returnTo) {
-  return `/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(returnTo || '/')}`;
+  return `/.auth/login/${STAFF_PROVIDER}?post_login_redirect_uri=${encodeURIComponent(returnTo || '/users.html')}`;
 }
 
 function refusal(user, minRole) {

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noai, noimageai"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f7f6f2">
+  <title>Harbour — Member requests</title>
+  <link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="users.css"><link rel="stylesheet" href="admin.css"><link rel="stylesheet" href="review.css">
+</head>
+<body class="users-page">
+ <div class="record-app">
+  <aside class="record-nav" aria-label="Main menu">
+   <a class="record-brand" href="users.html"><span class="record-brand-mark">H</span><span>Harbour</span></a>
+   <div class="record-nav-label">MAIN MENU</div>
+   <details class="record-nav-group"><summary><span>▦</span>Database Entries</summary><div class="record-subnav"><a class="subnav-link" href="users.html">List All</a></div></details>
+   <details class="record-nav-group" open><summary><span>⚙</span>Maintenance</summary><div class="record-subnav"><a class="subnav-link active" href="review.html">Member requests</a><a class="subnav-link" id="operatorsLink" href="admin.html" hidden>Operators</a></div></details>
+   <div class="record-nav-foot"><span class="local-dot"></span><span><b>Ngāti Kuri database</b><small>Approvers only</small></span></div>
+  </aside>
+  <main class="users-content">
+   <header class="record-topbar"><div class="breadcrumbs"><span>Maintenance</span><b>/</b><strong>Member requests</strong></div><span class="privacy"><i></i> <span id="whoAmI">Approvers only</span> · <a href="/.auth/logout">Sign out</a></span></header>
+   <section class="users-heading"><div><div class="eyebrow"><span class="eyebrow-dot"></span>NGĀTI KURI BENEFICIARY MANAGEMENT</div><h1>Member requests</h1><p>Check new registrations against the register, and approve or reject changes members ask for. Nothing changes in the register until you approve it.</p></div></section>
+   <div id="pageStatus" class="admin-message" role="status">Loading…</div>
+
+   <section class="admin-card">
+    <div class="admin-card-head"><h2>New registrations</h2><span id="registrationCount" class="admin-pill"></span></div>
+    <div id="registrations" class="review-list"></div>
+   </section>
+
+   <section class="admin-card">
+    <div class="admin-card-head"><h2>Changes to records</h2><span id="changeCount" class="admin-pill"></span></div>
+    <div id="changes" class="review-list"></div>
+   </section>
+   <footer class="page-footer"><span>Every decision is recorded in the audit log.</span><span>HARBOUR <b>·</b> MEMBER REQUESTS</span></footer>
+  </main>
+ </div>
+ <script type="module" src="review.js"></script>
+</body>
+</html>

@@ -554,9 +554,13 @@ function setListMode(mode) {
 
 init();
 
-// Admins see Maintenance → Operators (staff invites and roles).
+// Approvers see Maintenance → Member requests; Admins also see Operators (staff invites and roles).
 fetch('/api/me', { credentials: 'same-origin' })
   .then((response) => (response.ok ? response.json() : null))
-  .then((me) => { if (me?.role === 'Admin') $('#maintenanceNav').hidden = false; })
+  .then((me) => {
+    if (me?.role === 'Admin' || me?.role === 'Approver') $('#maintenanceNav').hidden = false;
+    if (me?.role === 'Admin') $('#operatorsButton').hidden = false;
+  })
   .catch(() => {});
 $('#operatorsButton').addEventListener('click', () => { window.location.href = 'admin.html'; });
+$('#reviewButton').addEventListener('click', () => { window.location.href = 'review.html'; });

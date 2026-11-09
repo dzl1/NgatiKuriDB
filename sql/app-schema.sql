@@ -85,3 +85,25 @@ CREATE TABLE app.ChangeRequests (
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_ChangeRequests_Status')
 CREATE INDEX IX_ChangeRequests_Status ON app.ChangeRequests (Status, SubmittedAt);
+
+-- What a member tells us when they register, so staff can find their existing record
+-- (link) or add them to the register (create). A member may resubmit after a rejection.
+IF OBJECT_ID('app.MemberRegistrations') IS NULL
+CREATE TABLE app.MemberRegistrations (
+  RegistrationId   INT IDENTITY PRIMARY KEY,
+  MemberAccountId  INT           NOT NULL REFERENCES app.MemberAccounts (MemberAccountId),
+  DetailsJson      NVARCHAR(MAX) NOT NULL,
+  Status           NVARCHAR(20)  NOT NULL DEFAULT 'pending' CHECK (Status IN ('pending', 'linked', 'created', 'rejected')),
+  SubmittedAt      DATETIME2(0)  NOT NULL DEFAULT SYSUTCDATETIME(),
+  ApplicantID      INT           NULL,
+  ReviewedBy       NVARCHAR(200) NULL,
+  ReviewedAt       DATETIME2(0)  NULL,
+  ReviewNote       NVARCHAR(1000) NULL
+);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_MemberRegistrations_Status')
+CREATE INDEX IX_MemberRegistrations_Status ON app.MemberRegistrations (Status, SubmittedAt);
+
+-- One linked member account per applicant.
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UX_MemberAccounts_ApplicantID')
+CREATE UNIQUE INDEX UX_MemberAccounts_ApplicantID ON app.MemberAccounts (ApplicantID) WHERE ApplicantID IS NOT NULL AND Status = 'linked';
