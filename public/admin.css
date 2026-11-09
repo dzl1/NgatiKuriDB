@@ -1,0 +1,30 @@
+.subnav-link{display:block;min-height:25px;padding:5px 8px;border-radius:3px;color:#626c61;text-decoration:none;font:10px var(--font)}
+.subnav-link:hover{background:#e8ece6}
+.subnav-link.active{background:#e2e9e0;color:#285d47;font-weight:600}
+.privacy a{color:inherit}
+.admin-card{background:#fff;border:1px solid #e2e5de;border-radius:5px;padding:16px 18px;margin-bottom:14px}
+.admin-card h2{font:600 14px var(--display);color:#2f3a31;margin-bottom:12px}
+.admin-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.admin-pill{font:9px var(--mono);padding:3px 7px;border-radius:10px;background:#edf2eb;color:#4c6a4f}
+.admin-pill.warn{background:#fbf0e4;color:#8a5a2b}
+.invite-form{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1.4fr) auto;gap:10px;align-items:end}
+.invite-form label{display:flex;flex-direction:column;gap:4px;color:#7c857b;font:10px var(--font)}
+.invite-form input,.invite-form select,.staff-table select{height:32px;border:1px solid #d9ded6;border-radius:4px;background:#fff;color:#343d35;padding:0 8px;font:11px var(--font);min-width:0}
+.invite-form button,.staff-actions button{height:32px;border:1px solid #285d47;border-radius:4px;background:#285d47;color:#fff;padding:0 14px;font:600 11px var(--font);cursor:pointer;white-space:nowrap}
+.invite-form button:disabled,.staff-actions button:disabled{opacity:.55;cursor:default}
+.staff-actions button{height:26px;padding:0 9px;font-size:10px;background:#fff;color:#3f5a45;border-color:#cfd8cc}
+.staff-actions button.danger{color:#9b4a35;border-color:#e4c8bf}
+.admin-hint{margin-top:10px;color:#8a9189;font-size:10px;line-height:1.5}
+.admin-message{font-size:11px;color:#4c6a4f;margin-top:8px;overflow-wrap:anywhere}
+.admin-message:empty{display:none}
+.admin-message.error{color:#9b4a35}
+.staff-table-wrap{overflow:auto}
+.staff-table{width:100%;border-collapse:collapse;font-size:11px}
+.staff-table th{text-align:left;color:#7c857b;font:9px var(--mono);text-transform:uppercase;padding:7px 8px;border-bottom:1px solid #e4e7e0}
+.staff-table td{padding:9px 8px;border-bottom:1px solid #f0f1ed;color:#424b43;vertical-align:middle}
+.staff-table td small{display:block;color:#8e958d;font-size:10px;margin-top:2px}
+.staff-status{font:9px var(--mono);padding:2px 6px;border-radius:9px;background:#edf2eb;color:#4c6a4f;white-space:nowrap}
+.staff-status.invited{background:#eef1f7;color:#46608a}
+.staff-status.expired,.staff-status.disabled{background:#f6ebe7;color:#9b4a35}
+.staff-actions{display:flex;gap:6px;justify-content:flex-end}
+@media(max-width:760px){.invite-form{grid-template-columns:1fr}.staff-table thead{display:none}.staff-table tr{display:grid;grid-template-columns:1fr 1fr;padding:8px 0;border-bottom:1px solid #eceee8}.staff-table td{border:0;padding:4px 6px}.staff-actions{justify-content:flex-start;grid-column:1/-1}}

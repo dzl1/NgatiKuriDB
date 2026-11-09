@@ -1,7 +1,4 @@
-import MDBReader from 'https://esm.sh/mdb-reader@3.2.0?bundle';
-import { Buffer } from 'https://esm.sh/buffer@6.0.3?bundle';
-
-globalThis.Buffer = Buffer;
+import { loadDatabase } from './harbour-data.js';
 
 const $ = (selector) => document.querySelector(selector);
 const state = { reader: null, tables: [], entityTable: null, keyField: null, people: [], selectedKey: null, tableRows: new Map(), rowIndexes: new Map(), relationFields: new Map(), edges: [], groupPages: new Map(), listMode: 'all', nameDescending: false, applicantStatuses: new Map() };
@@ -510,11 +507,9 @@ function makeRelatedGroup(group) {
 }
 
 async function init() {
-  $('#loadStatus').textContent = 'Reading data/BMSData.accdb…';
+  $('#loadStatus').textContent = 'Loading the database…';
   try {
-    const response = await fetch('/data/BMSData.accdb');
-    if (!response.ok) throw new Error('Could not find data/BMSData.accdb. Keep the database in the project data folder.');
-    state.reader = new MDBReader(Buffer.from(await response.arrayBuffer()));
+    state.reader = await loadDatabase();
     const names = state.reader.getTableNames({ normalTables: true, systemTables: false, linkedTables: false });
     state.tables = names.map((name) => { const table = state.reader.getTable(name); return { name, columns: table.getColumnNames(), count: table.rowCount }; });
     readApplicantStatuses();
@@ -558,3 +553,10 @@ function setListMode(mode) {
 }
 
 init();
+
+// Admins see Maintenance → Operators (staff invites and roles).
+fetch('/api/me', { credentials: 'same-origin' })
+  .then((response) => (response.ok ? response.json() : null))
+  .then((me) => { if (me?.role === 'Admin') $('#maintenanceNav').hidden = false; })
+  .catch(() => {});
+$('#operatorsButton').addEventListener('click', () => { window.location.href = 'admin.html'; });

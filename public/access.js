@@ -1,7 +1,4 @@
-import MDBReader from 'https://esm.sh/mdb-reader@3.2.0?bundle';
-import { Buffer } from 'https://esm.sh/buffer@6.0.3?bundle';
-
-globalThis.Buffer = Buffer;
+import { loadDatabase } from './harbour-data.js';
 
 const $ = (selector) => document.querySelector(selector);
 const state = { reader: null, tables: [], selected: null, records: [], visible: [], page: 0, pageSize: 100, search: '', sortColumn: null, sortDirection: 1, activeRecord: 0 };
@@ -25,11 +22,9 @@ function csvValue(value) {
 function setMessage(message) { $('#statusMessage').textContent = message; $('#ribbonMessage').textContent = message; }
 
 async function init() {
-  setMessage('Reading data/BMSData.accdb…');
+  setMessage('Loading the database…');
   try {
-    const response = await fetch('/data/BMSData.accdb');
-    if (!response.ok) throw new Error('Could not find data/BMSData.accdb in the project folder.');
-    state.reader = new MDBReader(Buffer.from(await response.arrayBuffer()));
+    state.reader = await loadDatabase();
     state.tables = state.reader.getTableNames({ normalTables: true, systemTables: false, linkedTables: false }).map((name) => {
       const table = state.reader.getTable(name);
       return { name, columns: table.getColumnNames(), definitions: table.getColumns(), count: table.rowCount };
@@ -39,7 +34,7 @@ async function init() {
     renderObjects();
     if (state.tables.length) selectTable(state.tables[0].name);
     else empty('No tables in this database', 'The reader did not find any user tables.');
-    setMessage(`${state.tables.length} tables loaded from the local database.`);
+    setMessage(`${state.tables.length} tables loaded from ${state.reader.source}.`);
   } catch (error) {
     empty('Could not read the database', error.message);
     setMessage(error.message);

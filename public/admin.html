@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f7f6f2">
+  <title>Harbour — Staff</title>
+  <link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="users.css"><link rel="stylesheet" href="admin.css">
+</head>
+<body class="users-page">
+ <div class="record-app">
+  <aside class="record-nav" aria-label="Main menu">
+   <a class="record-brand" href="users.html"><span class="record-brand-mark">H</span><span>Harbour</span></a>
+   <div class="record-nav-label">MAIN MENU</div>
+   <details class="record-nav-group"><summary><span>▦</span>Database Entries</summary><div class="record-subnav"><a class="subnav-link" href="users.html">List All</a></div></details>
+   <details class="record-nav-group" open><summary><span>⚙</span>Maintenance</summary><div class="record-subnav"><a class="subnav-link active" href="admin.html">Operators</a></div></details>
+   <div class="record-nav-foot"><span class="local-dot"></span><span><b>Ngāti Kuri database</b><small>Admins only</small></span></div>
+  </aside>
+  <main class="users-content">
+   <header class="record-topbar"><div class="breadcrumbs"><span>Maintenance</span><b>/</b><strong>Operators</strong></div><span class="privacy"><i></i> <span id="whoAmI">Admins only</span> · <a href="/.auth/logout">Sign out</a></span></header>
+   <section class="users-heading"><div><div class="eyebrow"><span class="eyebrow-dot"></span>NGĀTI KURI BENEFICIARY MANAGEMENT</div><h1>Operators</h1><p>Invite staff, set what they can do, and turn off access.</p></div></section>
+
+   <section class="admin-card">
+    <h2>Invite someone</h2>
+    <form id="inviteForm" class="invite-form" novalidate>
+     <label>Email<input id="inviteEmail" type="email" autocomplete="off" required placeholder="name@example.org"></label>
+     <label>Name<input id="inviteName" type="text" autocomplete="off" placeholder="Optional"></label>
+     <label>Role<select id="inviteRole"><option value="Viewer">Viewer — view the database</option><option value="Approver" selected>Approver — view + approve member changes</option><option value="Admin">Admin — everything + manage operators</option></select></label>
+     <button id="inviteButton" type="submit">Send invite</button>
+    </form>
+    <p class="admin-hint">People outside your organisation get an email from Microsoft. They accept it, set up multi-factor authentication, and their access starts the first time they sign in. Invites last 14 days.</p>
+    <div id="inviteResult" class="admin-message" role="status"></div>
+   </section>
+
+   <section class="admin-card">
+    <div class="admin-card-head"><h2>Operators</h2><span id="mfaPolicy" class="admin-pill"></span></div>
+    <div id="staffStatus" class="admin-message" role="status">Loading…</div>
+    <div class="staff-table-wrap"><table class="staff-table" id="staffTable" hidden>
+     <thead><tr><th>Name</th><th>Role</th><th>Status</th><th>Last sign-in</th><th>MFA</th><th></th></tr></thead>
+     <tbody></tbody>
+    </table></div>
+   </section>
+   <footer class="page-footer"><span>Every change here is recorded in the audit log.</span><span>HARBOUR <b>·</b> OPERATORS</span></footer>
+  </main>
+ </div>
+ <script type="module" src="admin.js"></script>
+</body>
+</html>

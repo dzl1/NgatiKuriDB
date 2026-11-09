@@ -1,7 +1,4 @@
-import MDBReader from 'https://esm.sh/mdb-reader@3.2.0?bundle';
-import { Buffer } from 'https://esm.sh/buffer@6.0.3?bundle';
-
-globalThis.Buffer = Buffer;
+import { loadDatabase } from './harbour-data.js';
 
 (() => {
   const $ = (s) => document.querySelector(s);
@@ -15,11 +12,8 @@ globalThis.Buffer = Buffer;
 
   async function loadBundledDatabase() {
     try {
-      report('Reading data/BMSData.accdb…');
-      const response = await fetch('/data/BMSData.accdb');
-      if (!response.ok) throw new Error('Could not find data/BMSData.accdb. Check that the database is in the project’s data folder.');
-      const bytes = await response.arrayBuffer();
-      state.reader = new MDBReader(Buffer.from(bytes));
+      report('Loading the database…');
+      state.reader = await loadDatabase();
       state.sourceName = 'BMSData.accdb';
       state.tables = state.reader.getTableNames({ normalTables: true, systemTables: false, linkedTables: false }).map((name) => {
         const table = state.reader.getTable(name);
@@ -41,7 +35,7 @@ globalThis.Buffer = Buffer;
     $('#uploadView').classList.add('hidden');
     $('#databaseView').classList.remove('hidden');
     $('#dbName').textContent = state.sourceName;
-    $('#dbMeta').textContent = `${state.tables.length} ${state.tables.length === 1 ? 'table' : 'tables'} · read from the local data folder`;
+    $('#dbMeta').textContent = `${state.tables.length} ${state.tables.length === 1 ? 'table' : 'tables'} · ${state.reader.source}`;
     $('#tableCount').textContent = String(state.tables.length).padStart(2, '0');
     drawTableList();
     if (state.tables.length) selectTable(state.tables[0].name);

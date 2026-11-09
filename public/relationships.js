@@ -1,7 +1,4 @@
-import MDBReader from 'https://esm.sh/mdb-reader@3.2.0?bundle';
-import { Buffer } from 'https://esm.sh/buffer@6.0.3?bundle';
-
-globalThis.Buffer = Buffer;
+import { loadDatabase } from './harbour-data.js';
 
 const $ = (selector) => document.querySelector(selector);
 const state = { reader: null, tables: [], records: new Map(), relationships: [] };
@@ -28,17 +25,15 @@ function valueKey(value) {
 }
 
 async function loadDatabase() {
-  say('Reading relationship metadata…', 'Loading the database in your browser and checking its saved relationship definitions.');
+  say('Reading relationship metadata…', 'Loading the database and checking its saved relationship definitions.');
   try {
-    const response = await fetch('/data/BMSData.accdb');
-    if (!response.ok) throw new Error('Could not find data/BMSData.accdb in the project folder.');
-    state.reader = new MDBReader(Buffer.from(await response.arrayBuffer()));
+    state.reader = await loadDatabase();
     const names = state.reader.getTableNames({ normalTables: true, systemTables: false, linkedTables: false });
     state.tables = names.map((name) => {
       const table = state.reader.getTable(name);
       return { name, columns: table.getColumnNames(), rowCount: table.rowCount, definitions: table.getColumns() };
     });
-    $('#relationshipSubtitle').textContent = `${state.tables.length} tables · BMSData.accdb · read locally in your browser`;
+    $('#relationshipSubtitle').textContent = `${state.tables.length} tables · ${state.reader.source}`;
     $('#tableInventorySubtitle').textContent = `${state.tables.length} tables in the database`;
     renderInventory();
     await analyze();

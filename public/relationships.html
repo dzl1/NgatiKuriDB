@@ -6,14 +6,14 @@
   <link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="relationships.css">
 </head>
 <body class="relationships-page">
-  <header class="topbar relationship-topbar"><div class="breadcrumbs"><a href="index.html">Workspace</a><b>/</b><strong>Table relationships</strong></div><div class="top-actions"><a class="access-view-link" href="users.html">♙ People</a><a class="access-view-link" href="access.html">▦ Access-style view</a><span class="privacy"><i></i> Database stays on this device</span></div></header>
+  <header class="topbar relationship-topbar"><div class="breadcrumbs"><a href="index.html">Workspace</a><b>/</b><strong>Table relationships</strong></div><div class="top-actions"><a class="access-view-link" href="users.html">♙ People</a><a class="access-view-link" href="access.html">▦ Access-style view</a><span class="privacy"><i></i> Staff only · <a href="/.auth/logout">Sign out</a></span></div></header>
   <main class="relationship-content">
     <div class="relationship-intro"><div><div class="eyebrow"><span class="eyebrow-dot"></span>DATABASE STRUCTURE</div><h1>How your tables connect.</h1><p id="relationshipSubtitle">Loading table definitions and checking for relationships…</p></div><a class="back-link" href="index.html">← Back to tables</a></div>
     <section class="relationship-summary"><span class="summary-icon">⇄</span><div><strong id="summaryTitle">Reading relationship metadata…</strong><p id="summaryText">Checking the database’s saved relationships, then comparing key-like fields.</p></div><button id="reanalyze" class="reanalyze-button">↻ Refresh map</button></section>
     <section class="relationships-layout"><div class="relationship-panel"><div class="panel-heading"><div><h2>Suggested joins</h2><p>Review these before using them to combine records.</p></div><span id="edgeCount" class="count-pill">—</span></div><div id="relationshipList" class="relationship-list"><div class="relationship-loading">Analysing table fields and matching values…</div></div></div>
       <aside class="table-inventory"><div class="panel-heading"><div><h2>Tables</h2><p id="tableInventorySubtitle">Database objects</p></div></div><div id="inventoryList" class="inventory-list"></div></aside></section>
     <div class="relationship-footnote"><span>ⓘ</span><div><strong>About suggested joins</strong><p>Access-defined relationships are shown when available. Other links are inferred from field names and overlapping values. Confirm the key fields and relationship direction with someone familiar with the data before relying on a suggested join.</p></div></div>
-    <footer class="page-footer"><span>Harbour reads the database locally in your browser.</span><span>HARBOUR <b>·</b> RELATIONSHIP MAP</span></footer>
+    <footer class="page-footer"><span>Harbour · staff sign-in required.</span><span>HARBOUR <b>·</b> RELATIONSHIP MAP</span></footer>
   </main>
   <script type="module" src="relationships.js"></script>
 </body>
