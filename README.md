@@ -88,6 +88,7 @@ Day to day:
 
 ```sh
 ./scripts/deploy.sh                                   # deploy code changes
+SQL_SERVER=… SQL_DATABASE=harbour node scripts/apply-schema.js   # after changing sql/app-schema.sql: create new Harbour tables (needs your IP in the SQL firewall)
 curl https://ngatikuri-harbour-mmwucc.azurewebsites.net/healthz/db   # app can reach the database
 node scripts/setup-member-signin.js <tenant> <url> <vault> --rotate-secret   # new member sign-in secret (restart the app after)
 ```
