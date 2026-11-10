@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noai, noimageai"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f7f6f2">
+  <title>Harbour — Add person</title>
+  <link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="users.css"><link rel="stylesheet" href="admin.css"><link rel="stylesheet" href="review.css"><link rel="stylesheet" href="add-person.css">
+</head>
+<body class="users-page">
+ <div class="record-app">
+  <aside class="record-nav" aria-label="Main menu">
+   <a class="record-brand" href="users.html"><span class="record-brand-mark">H</span><span>Harbour</span></a>
+   <div class="record-nav-label">MAIN MENU</div>
+   <details class="record-nav-group" open><summary><span>▦</span>Database Entries</summary><div class="record-subnav"><a class="subnav-link" href="users.html">List All</a><a class="subnav-link active" href="add-person.html">Add person</a></div></details>
+   <details class="record-nav-group"><summary><span>⚙</span>Maintenance</summary><div class="record-subnav"><a class="subnav-link" href="review.html">Member requests</a><a class="subnav-link" id="operatorsLink" href="admin.html" hidden>Operators</a></div></details>
+   <div class="record-nav-foot"><span class="local-dot"></span><span><b>Ngāti Kuri database</b><small>Approvers only</small></span></div>
+  </aside>
+  <main class="users-content">
+   <header class="record-topbar"><div class="breadcrumbs"><span>Database Entries</span><b>/</b><strong>Add person</strong></div><span class="privacy"><i></i> <span id="whoAmI">Approvers only</span> · <a href="/.auth/logout">Sign out</a></span></header>
+   <section class="users-heading"><div><div class="eyebrow"><span class="eyebrow-dot"></span>NGĀTI KURI BENEFICIARY MANAGEMENT</div><h1>Add person</h1><p>Enter a paper application or anyone else who needs adding to the register. Only first and last name are needed; fill in what is on the form.</p></div></section>
+   <div id="pageStatus" class="admin-message" role="status" aria-live="polite"></div>
+
+   <form id="personForm" novalidate hidden>
+    <section class="admin-card">
+     <h2>Person</h2>
+     <div class="person-grid" id="personFields"></div>
+    </section>
+    <section class="admin-card">
+     <h2>Application</h2>
+     <div class="person-grid">
+      <label class="person-field">Status<select id="statusId"></select></label>
+      <label class="person-field">Paper form received on<input id="receivedOn" type="date"><small>Leave empty if there was no paper form.</small></label>
+      <label class="person-field wide">Staff notes<textarea id="staffNotes" maxlength="4000" placeholder="Anything else from the form, or how they applied"></textarea></label>
+     </div>
+    </section>
+    <section class="admin-card">
+     <h2>Whakapapa</h2>
+     <div class="person-grid" id="whakapapaFields"></div>
+    </section>
+    <div id="similar" class="admin-card" hidden></div>
+    <div class="review-actions form-end">
+     <button id="saveButton" type="submit">Check and add person</button>
+     <a class="secondary-link" href="users.html">Cancel</a>
+    </div>
+   </form>
+
+   <section id="done" class="admin-card" hidden>
+    <h2 id="doneTitle">Person added</h2>
+    <p id="doneText" class="admin-hint"></p>
+    <div class="review-actions"><a id="openRecord" class="button-link" href="users.html">Open their record</a><button id="addAnother" type="button" class="secondary">Add another person</button></div>
+   </section>
+   <footer class="page-footer"><span>Every person added is recorded in the audit log.</span><span>HARBOUR <b>·</b> ADD PERSON</span></footer>
+  </main>
+ </div>
+ <script type="module" src="add-person.js"></script>
+</body>
+</html>

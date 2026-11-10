@@ -308,24 +308,8 @@ export async function decideRegistration(staff, registrationId, { action, applic
     }
 
     if (action === 'create') {
-      const next = await request().query('SELECT ISNULL(MAX(ApplicantID), 0) + 1 AS id, ISNULL(MAX(ApplicantAutoID), 0) + 1 AS auto, ISNULL(MAX(_RowOrder), 0) + 1 AS row FROM bms.Applicants WITH (TABLOCKX)');
-      const { id, auto, row } = next.recordset[0];
-      linkedId = id;
-      const insert = request()
-        .input('row', sql.Int, row).input('auto', sql.Int, auto).input('id', sql.Int, id)
-        .input('status', sql.SmallInt, NEW_APPLICANT_STATUS)
-        .input('notes', sql.NVarChar(sql.MAX), registrationNotes(details, reviewer));
       const values = { ...details, Email: details.Email || details.SignInEmail || null };
-      const names = [];
-      for (const field of MEMBER_FIELDS) {
-        insert.input(`f_${field.name}`, sqlType(field), sqlValue(field, values[field.name] ?? null));
-        names.push(field.name);
-      }
-      // Booleans in the Access tables are NOT NULL.
-      await insert.query(`
-        INSERT INTO bms.Applicants (_RowOrder, ApplicantAutoID, ApplicantID, ApplicantStatusID, Notes, NoteAddedDate,
-          Inactive, AddressLocked, Deceased, ${names.map((name) => `[${name}]`).join(', ')})
-        VALUES (@row, @auto, @id, @status, @notes, SYSUTCDATETIME(), 0, 0, 0, ${names.map((name) => `@f_${name}`).join(', ')})`);
+      linkedId = await insertApplicant(request, values, NEW_APPLICANT_STATUS, registrationNotes(details, reviewer, 'Registered online'));
     }
 
     const status = { link: 'linked', create: 'created', reject: 'rejected' }[action];
@@ -347,9 +331,33 @@ export async function decideRegistration(staff, registrationId, { action, applic
   }
 }
 
-function registrationNotes(details, reviewer) {
+/**
+ * Adds a person to bms.Applicants inside the caller's transaction and returns their new ApplicantID.
+ * IDs follow on from the highest existing ones, as Access numbered them.
+ */
+async function insertApplicant(request, values, statusId, notes) {
+  const next = await request().query('SELECT ISNULL(MAX(ApplicantID), 0) + 1 AS id, ISNULL(MAX(ApplicantAutoID), 0) + 1 AS auto, ISNULL(MAX(_RowOrder), 0) + 1 AS row FROM bms.Applicants WITH (TABLOCKX)');
+  const { id, auto, row } = next.recordset[0];
+  const insert = request()
+    .input('row', sql.Int, row).input('auto', sql.Int, auto).input('id', sql.Int, id)
+    .input('status', sql.SmallInt, statusId)
+    .input('notes', sql.NVarChar(sql.MAX), notes);
+  const names = [];
+  for (const field of MEMBER_FIELDS) {
+    insert.input(`f_${field.name}`, sqlType(field), sqlValue(field, values[field.name] ?? null));
+    names.push(field.name);
+  }
+  // Booleans in the Access tables are NOT NULL.
+  await insert.query(`
+    INSERT INTO bms.Applicants (_RowOrder, ApplicantAutoID, ApplicantID, ApplicantStatusID, Notes, NoteAddedDate,
+      Inactive, AddressLocked, Deceased, ${names.map((name) => `[${name}]`).join(', ')})
+    VALUES (@row, @auto, @id, @status, @notes, SYSUTCDATETIME(), 0, 0, 0, ${names.map((name) => `@f_${name}`).join(', ')})`);
+  return id;
+}
+
+function registrationNotes(details, reviewer, how) {
   const today = new Date().toLocaleDateString('en-NZ', { timeZone: 'Pacific/Auckland', day: 'numeric', month: 'short', year: 'numeric' });
-  const lines = [`Registered online; added to the register ${today} by ${reviewer}.`];
+  const lines = [`${how}; added to the register ${today} by ${reviewer}.`];
   for (const field of REGISTRATION_EXTRA) {
     if (details[field.name]) lines.push(`${field.label}: ${field.type === 'choice' ? field.options.find(([value]) => value === details[field.name])?.[1] : details[field.name]}`);
   }
@@ -395,6 +403,57 @@ export async function decideChange(staff, changeRequestId, { action, note }) {
       .query('UPDATE app.ChangeRequests SET Status = @status, ReviewedBy = @by, ReviewedAt = SYSUTCDATETIME(), ReviewNote = @note WHERE ChangeRequestId = @id');
     await transaction.commit();
     await audit(staff, `change.${action === 'approve' ? 'approved' : 'rejected'}`, 'bms.Applicants', String(change.ApplicantID), { changeRequestId, fields: Object.keys(changes) });
+  } catch (error) {
+    await transaction.rollback().catch(() => {});
+    throw error;
+  }
+}
+
+// ---- Staff adding a person directly (paper applications) ----
+
+/** Fields and choices for the staff "Add person" form. */
+export async function applicantFormOptions() {
+  const pool = await getPool();
+  const statuses = await pool.request().query("SELECT ApplicantStatusID AS id, ApplicantStatus AS label FROM bms.ApplicantStatus WHERE ApplicantStatusID <> 0 AND ApplicantStatus IS NOT NULL ORDER BY ApplicantStatusID");
+  return { fields: MEMBER_FIELDS, extra: REGISTRATION_EXTRA, statuses: statuses.recordset, defaultStatus: NEW_APPLICANT_STATUS };
+}
+
+// Staff entering a paper form only need a name; everything else is optional.
+function cleanStaffEntry(input) {
+  const details = {};
+  for (const field of [...MEMBER_FIELDS, ...REGISTRATION_EXTRA]) {
+    const value = cleanValue(field, input?.[field.name]);
+    if (value !== null) details[field.name] = value;
+  }
+  if (!details.FirstName || !details.LastName) throw new MemberError('First name and last name are needed.');
+  if (input?.ReceivedOn) details.ReceivedOn = cleanValue({ label: 'Date received', type: 'date' }, input.ReceivedOn);
+  return details;
+}
+
+/** People already on the register who look like this entry (same checks as online registrations). */
+export async function findSimilar(input) {
+  const details = cleanStaffEntry(input);
+  const pool = await getPool();
+  return suggestMatches(pool, details);
+}
+
+export async function createApplicant(staff, input) {
+  const details = cleanStaffEntry(input);
+  const pool = await getPool();
+  const statusId = Number(input?.statusId ?? NEW_APPLICANT_STATUS);
+  const status = await pool.request().input('s', sql.Int, statusId).query('SELECT 1 AS ok FROM bms.ApplicantStatus WHERE ApplicantStatusID = @s');
+  if (!status.recordset.length) throw new MemberError('Choose a status.');
+  const staffNote = input?.notes ? String(input.notes).trim().slice(0, 4000) : '';
+  const how = details.ReceivedOn ? `Paper application received ${details.ReceivedOn}` : 'Entered by staff';
+  const notes = [registrationNotes(details, staff.email || staff.name, how), staffNote].filter(Boolean).join('\n');
+
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+  try {
+    const applicantId = await insertApplicant(() => new sql.Request(transaction), details, statusId, notes);
+    await transaction.commit();
+    await audit(staff, 'applicant.created', 'bms.Applicants', String(applicantId), { statusId, source: details.ReceivedOn ? 'paper' : 'staff' });
+    return { applicantId };
   } catch (error) {
     await transaction.rollback().catch(() => {});
     throw error;

@@ -28,8 +28,8 @@ param memberTenantName string = 'ngatikurimembers'
 @description('Object ID of the person who manages secrets (gets Key Vault Secrets Officer).')
 param keyVaultAdminObjectId string = sqlAdminObjectId
 
-@description('Refuse staff sessions that did not use multi-factor authentication. Turn on once MFA is enforced in the tenant.')
-param requireStaffMfa bool = false
+@description('Refuse staff sessions that did not use multi-factor authentication.')
+param requireStaffMfa bool = true
 
 @description('Monthly budget for this resource group, in the billing currency (USD for sponsorship credits).')
 param monthlyBudget int = 40
@@ -200,7 +200,8 @@ resource auth 'Microsoft.Web/sites/config@2024-04-01' = if (!empty(authClientId)
         enabled: true
         registration: {
           clientId: authClientId
-          openIdIssuer: '${environment().authentication.loginEndpoint}${tenantId}/v2.0'
+          // v1 issuer: v1 ID tokens carry the amr claim ("mfa"), which v2 ID tokens leave out.
+          openIdIssuer: 'https://sts.windows.net/${tenantId}/'
         }
         validation: {
           allowedAudiences: [ authClientId, 'api://${authClientId}' ]

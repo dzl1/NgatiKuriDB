@@ -157,6 +157,21 @@ app.post('/api/review/changes/:id', requireRole('Approver'), async (request, res
   try { await members.decideChange(request.user, Number(request.params.id), request.body ?? {}); response.json({ ok: true }); } catch (error) { next(error); }
 });
 
+// ---- Adding a person by hand, e.g. from a paper application (Approvers) ----
+
+app.get('/api/staff/applicants/form', requireRole('Approver'), async (request, response, next) => {
+  if (needSql(response)) return;
+  try { response.json(await members.applicantFormOptions()); } catch (error) { next(error); }
+});
+app.post('/api/staff/applicants/similar', requireRole('Approver'), async (request, response, next) => {
+  if (needSql(response)) return;
+  try { response.json(await members.findSimilar(request.body)); } catch (error) { next(error); }
+});
+app.post('/api/staff/applicants', requireRole('Approver'), async (request, response, next) => {
+  if (needSql(response)) return;
+  try { response.status(201).json(await members.createApplicant(request.user, request.body)); } catch (error) { next(error); }
+});
+
 // ---- Staff management (Admins) ----
 
 function needSql(response) {
@@ -295,6 +310,7 @@ app.use(express.static(path.join(root, 'www'), { index: 'index.html' }));
 // Staff pages. Operators needs Admin, Member requests needs Approver, everything else Viewer.
 app.get('/admin.html', requireRole('Admin'));
 app.get('/review.html', requireRole('Approver'));
+app.get('/add-person.html', requireRole('Approver'));
 app.use(requireRole('Viewer'), express.static(path.join(root, 'public'), { index: false }));
 
 app.use((request, response) => response.status(404).type('text').send('Not found'));

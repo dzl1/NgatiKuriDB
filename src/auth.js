@@ -63,6 +63,13 @@ export function getIdentity(request) {
   const id = claim(...OBJECT_ID_CLAIMS);
   if (!id) return null;
   const provider = principal.auth_typ;
+  // Entra puts "mfa" in the amr claim of v1 tokens only, so staff sign-in uses the v1 issuer.
+  const amr = claims.filter((item) => AMR_CLAIMS.includes(item.typ)).map((item) => item.val);
+  const mfa = amr.includes('mfa');
+  if (provider === STAFF_PROVIDER && !mfa) {
+    // Diagnostics only: which sign-in methods Entra reported (e.g. "pwd"), and the claim types present.
+    console.warn(`[harbour] Staff sign-in without MFA: amr=[${amr.join(',')}] claims=[${[...new Set(claims.map((item) => item.typ))].join(',')}]`);
+  }
   const emailClaims = ['email', 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress'];
   return {
     id,
@@ -70,8 +77,11 @@ export function getIdentity(request) {
     givenName: claim('given_name', 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname') || null,
     familyName: claim('family_name', 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname') || null,
     // Staff: their sign-in name. Members: the email External ID verified at sign-up.
-    email: (provider === STAFF_PROVIDER ? claim('preferred_username', ...emailClaims) : claim(...emailClaims)) || null,
-    mfa: claims.some((item) => AMR_CLAIMS.includes(item.typ) && item.val === 'mfa'),
+    // (preferred_username is in v2 tokens; upn/unique_name in the v1 tokens staff sign-in uses.)
+    email: (provider === STAFF_PROVIDER
+      ? claim('preferred_username', 'upn', 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/upn', 'unique_name', ...emailClaims)
+      : claim(...emailClaims)) || null,
+    mfa,
     provider,
   };
 }

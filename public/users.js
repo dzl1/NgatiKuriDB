@@ -209,7 +209,13 @@ function loadPeople() {
     $('#peopleSearch').value = '';
     renderPeople();
     $('#exportUsersButton').disabled = state.people.length === 0;
-    if (state.people.length) selectPerson(state.people[0].key);
+    // ?person=<key> opens that person (used after adding someone, and from duplicate checks).
+    const wanted = new URLSearchParams(window.location.search).get('person');
+    const requested = wanted !== null ? state.people.find((person) => token(person.key) === token(wanted)) : null;
+    if (requested) {
+      selectPerson(requested.key);
+      document.querySelector('.person-list-item.selected')?.scrollIntoView({ block: 'center' });
+    } else if (state.people.length) selectPerson(state.people[0].key);
     else showEmptyDetail('No people found', `The selected key field “${state.keyField}” has no values.`);
     $('#loadStatus').textContent = '';
   } catch (error) { $('#loadStatus').textContent = `Could not read ${table.name}: ${error.message}`; }
@@ -558,9 +564,15 @@ init();
 fetch('/api/me', { credentials: 'same-origin' })
   .then((response) => (response.ok ? response.json() : null))
   .then((me) => {
-    if (me?.role === 'Admin' || me?.role === 'Approver') $('#maintenanceNav').hidden = false;
+    if (me?.role === 'Admin' || me?.role === 'Approver') {
+      $('#maintenanceNav').hidden = false;
+      $('#addPersonRow').hidden = false;
+      $('#addPersonNav').hidden = false;
+    }
     if (me?.role === 'Admin') $('#operatorsButton').hidden = false;
   })
   .catch(() => {});
 $('#operatorsButton').addEventListener('click', () => { window.location.href = 'admin.html'; });
 $('#reviewButton').addEventListener('click', () => { window.location.href = 'review.html'; });
+$('#addPersonButton').addEventListener('click', () => { window.location.href = 'add-person.html'; });
+$('#addPersonNav').addEventListener('click', () => { window.location.href = 'add-person.html'; });

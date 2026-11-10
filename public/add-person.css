@@ -1,0 +1,13 @@
+.person-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 16px}
+.person-field{display:flex;flex-direction:column;gap:4px;color:#5b655b;font:600 10px var(--font);min-width:0}
+.person-field.wide{grid-column:1/-1}
+.person-field input,.person-field select,.person-field textarea{height:32px;border:1px solid #d9ded6;border-radius:4px;background:#fff;color:#343d35;padding:0 8px;font:400 11px var(--font);min-width:0}
+.person-field textarea{height:72px;padding:7px 8px;resize:vertical}
+.person-field small{font:400 9px var(--font);color:#8a9189}
+.person-field input:invalid{border-color:#d7a596}
+.form-end{margin-bottom:14px}
+.secondary-link{font-size:11px;color:#5d6b5d}
+.button-link{display:inline-flex;align-items:center;height:30px;padding:0 12px;border-radius:4px;background:#285d47;color:#fff;font:600 11px var(--font);text-decoration:none}
+.similar-intro{font-size:11px;color:#8a5a2b;margin-bottom:8px}
+@media(max-width:900px){.person-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.person-grid{grid-template-columns:1fr}}
