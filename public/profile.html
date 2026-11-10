@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noai, noimageai"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f7f6f2">
+  <title>Harbour — My profile</title>
+  <link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="users.css"><link rel="stylesheet" href="admin.css">
+  <style>
+   .subnav-link[hidden]{display:none}
+   .profile-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 24px;margin-top:4px}
+   .profile-list div span{display:block;color:#858d84;font-size:10px}
+   .profile-list div strong{display:block;color:#343d35;font-size:12px;font-weight:500;margin-top:3px;overflow-wrap:anywhere}
+   .profile-list .good{color:#285d47}.profile-list .warn{color:#9b4a35}
+   @media(max-width:600px){.profile-list{grid-template-columns:1fr}}
+  </style>
+</head>
+<body class="users-page">
+ <div class="record-app">
+  <aside class="record-nav" aria-label="Main menu">
+   <a class="record-brand" href="users.html"><span class="record-brand-mark">H</span><span>Harbour</span></a>
+   <div class="record-nav-label">MAIN MENU</div>
+   <details class="record-nav-group" open><summary><span>▤</span>Applications</summary><div class="record-subnav"><a class="subnav-link" href="users.html">List All</a><a class="subnav-link" id="addPersonLink" href="add-person.html" hidden>Add person</a></div></details>
+   <details class="record-nav-group" id="maintenanceNav" hidden><summary><span>⚙</span>Maintenance</summary><div class="record-subnav"><a class="subnav-link" href="review.html">Member requests</a><a class="subnav-link" id="operatorsLink" href="admin.html" hidden>Operators</a></div></details>
+   <div class="record-nav-foot"><span class="local-dot"></span><span><b>Ngāti Kuri database</b><small>Staff sign-in required</small></span></div>
+  </aside>
+  <main class="users-content">
+   <header class="record-topbar"><div class="breadcrumbs"><span>Account</span><b>/</b><strong>My profile</strong></div><span class="topbar-session"><a class="home-link" href="/">⌂ Home</a><span data-session="light"></span></span></header>
+   <section class="users-heading"><div><div class="eyebrow"><span class="eyebrow-dot"></span>NGĀTI KURI BENEFICIARY MANAGEMENT</div><h1 id="profileName">My profile</h1><p>Your Harbour account. To change your name or password, use your Microsoft account.</p></div></section>
+   <div id="pageStatus" class="admin-message" role="status"></div>
+   <section class="admin-card"><h2>Account</h2><div class="profile-list" id="accountDetails"></div></section>
+   <section class="admin-card"><h2>Security</h2><div class="profile-list" id="securityDetails"></div>
+    <p class="admin-hint">Manage your password and sign-in methods (Microsoft Authenticator, phone) at <a href="https://mysignins.microsoft.com/security-info" target="_blank" rel="noopener">mysignins.microsoft.com</a>.</p></section>
+   <footer class="page-footer"><span>Harbour · staff sign-in required.</span><span>HARBOUR <b>·</b> MY PROFILE</span></footer>
+  </main>
+ </div>
+ <script type="module" src="profile.js"></script>
+ <script type="module" src="/session.js"></script>
+</body>
+</html>

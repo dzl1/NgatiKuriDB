@@ -2,10 +2,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import compression from 'compression';
 import express from 'express';
-import { audit, forgetStaff, getMemberIdentity, getUser, memberLoginUrl, onAppService, requireRole, ROLES } from './src/auth.js';
+import { audit, forgetStaff, getIdentity, getMemberIdentity, getUser, MEMBER_PROVIDER, memberLoginUrl, onAppService, requireRole, ROLES, STAFF_PROVIDER } from './src/auth.js';
 import { getPool, sql, sqlConfigured } from './src/db.js';
 import { inviteToTenant } from './src/graph.js';
 import * as members from './src/members.js';
+import { createRegisterCache, PHASE_STATUS } from './src/register.js';
 import { snapshotFromAccdb, snapshotFromSql } from './src/snapshot.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
@@ -17,6 +18,9 @@ if (onAppService && !useSql) {
   console.error('[harbour] SQL_SERVER and SQL_DATABASE must be set on App Service.');
   process.exit(1);
 }
+
+// The register, kept in memory so staff pages load quickly (see src/register.js).
+const register = createRegisterCache(() => (useSql ? snapshotFromSql() : snapshotFromAccdb(localDatabase)));
 
 const app = express();
 app.disable('x-powered-by');
@@ -94,6 +98,46 @@ app.get('/healthz/db', async (request, response) => {
   }
 });
 
+// Public: who is signed in (if anyone), for the profile menu on every page. Reveals only the
+// signed-in person's own name, email and Harbour role.
+app.get('/api/session', async (request, response, next) => {
+  try {
+    const identity = getIdentity(request);
+    if (!identity) return response.json({ signedIn: false });
+    if (identity.provider === MEMBER_PROVIDER) {
+      return response.json({ signedIn: true, kind: 'member', name: identity.name, email: identity.email, profileUrl: '/member.html' });
+    }
+    if (identity.provider === STAFF_PROVIDER) {
+      const user = await getUser(request);
+      const staff = user?.access === 'ok';
+      return response.json({
+        signedIn: true, kind: 'staff', name: identity.name, email: identity.email,
+        role: staff ? user.role : null, profileUrl: staff ? '/profile.html' : null, appUrl: staff ? '/users.html' : null,
+      });
+    }
+    return response.json({ signedIn: false });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// The signed-in staff member's own details.
+app.get('/api/staff/profile', requireRole('Viewer'), async (request, response, next) => {
+  try {
+    const { user } = request;
+    let account = null;
+    if (useSql && user.staffUserId) {
+      const pool = await getPool();
+      const result = await pool.request().input('id', sql.Int, user.staffUserId)
+        .query('SELECT Email, DisplayName, Role, Status, InvitedBy, InvitedAt, ActivatedAt, LastSignInAt, LastSignInMfa FROM app.StaffUsers WHERE StaffUserId = @id');
+      account = result.recordset[0] ?? null;
+    }
+    response.json({ name: user.name, email: user.email, role: user.role, mfa: user.mfa, provider: user.provider, account });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get('/api/me', async (request, response, next) => {
   try {
     const user = await getUser(request);
@@ -104,12 +148,48 @@ app.get('/api/me', async (request, response, next) => {
   }
 });
 
-// Every table the staff viewer needs, in one response. Each read is audited.
+// The people list: names, emails and statuses only. Linked records come from /people/:key.
+app.get('/api/staff/people', requireRole('Viewer'), async (request, response, next) => {
+  try {
+    const json = await register.peopleListJson();
+    await audit(request.user, 'people.list', null, null, null);
+    response.type('json').set('Cache-Control', 'no-store').send(json);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Everyone in a phase (?view=all|processing|…) with their linked records, as CSV. Audited.
+app.get('/api/staff/people/export.csv', requireRole('Viewer'), async (request, response, next) => {
+  try {
+    const view = Object.hasOwn(PHASE_STATUS, request.query.view) ? request.query.view : 'all';
+    const { csv, count } = await register.exportCsv(view);
+    await audit(request.user, 'people.export', null, null, { view, people: count });
+    response.type('text/csv; charset=utf-8').set('Cache-Control', 'no-store')
+      .attachment(view === 'all' ? 'NgatiKuri_All_Users.csv' : `NgatiKuri_${view}.csv`).send(csv);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// One person and every record linked to them. Each view is audited.
+app.get('/api/staff/people/:key', requireRole('Viewer'), async (request, response, next) => {
+  try {
+    const detail = await register.personDetail(request.params.key);
+    if (!detail) return response.status(404).json({ error: 'That person is not on the register.' });
+    await audit(request.user, 'person.read', detail.table.name, String(request.params.key), null);
+    return response.set('Cache-Control', 'no-store').json(detail);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// Every table, in one response (the table browser pages). Served from the cached copy. Audited.
 app.get('/api/staff/snapshot', requireRole('Viewer'), async (request, response, next) => {
   try {
-    const snapshot = useSql ? await snapshotFromSql() : await snapshotFromAccdb(localDatabase);
-    await audit(request.user, 'snapshot.read', null, null, { tables: snapshot.tables.length });
-    response.json(snapshot);
+    const { json, tables } = await register.snapshotJson();
+    await audit(request.user, 'snapshot.read', null, null, { tables });
+    response.type('json').set('Cache-Control', 'no-store').send(json);
   } catch (error) {
     next(error);
   }
@@ -150,11 +230,11 @@ app.get('/api/review/search', requireRole('Approver'), async (request, response,
 });
 app.post('/api/review/registrations/:id', requireRole('Approver'), async (request, response, next) => {
   if (needSql(response)) return;
-  try { response.json(await members.decideRegistration(request.user, Number(request.params.id), request.body ?? {})); } catch (error) { next(error); }
+  try { const result = await members.decideRegistration(request.user, Number(request.params.id), request.body ?? {}); register.invalidate(); response.json(result); } catch (error) { next(error); }
 });
 app.post('/api/review/changes/:id', requireRole('Approver'), async (request, response, next) => {
   if (needSql(response)) return;
-  try { await members.decideChange(request.user, Number(request.params.id), request.body ?? {}); response.json({ ok: true }); } catch (error) { next(error); }
+  try { await members.decideChange(request.user, Number(request.params.id), request.body ?? {}); register.invalidate(); response.json({ ok: true }); } catch (error) { next(error); }
 });
 
 // ---- Adding a person by hand, e.g. from a paper application (Approvers) ----
@@ -169,11 +249,11 @@ app.post('/api/staff/applicants/similar', requireRole('Approver'), async (reques
 });
 app.post('/api/staff/applicants/:id/status', requireRole('Approver'), async (request, response, next) => {
   if (needSql(response)) return;
-  try { response.json(await members.setApplicantStatus(request.user, Number(request.params.id), request.body ?? {})); } catch (error) { next(error); }
+  try { const result = await members.setApplicantStatus(request.user, Number(request.params.id), request.body ?? {}); register.invalidate(); response.json(result); } catch (error) { next(error); }
 });
 app.post('/api/staff/applicants', requireRole('Approver'), async (request, response, next) => {
   if (needSql(response)) return;
-  try { response.status(201).json(await members.createApplicant(request.user, request.body)); } catch (error) { next(error); }
+  try { const result = await members.createApplicant(request.user, request.body); register.invalidate(); response.status(201).json(result); } catch (error) { next(error); }
 });
 
 // ---- Staff management (Admins) ----
@@ -339,5 +419,6 @@ app.listen(port, host, (error) => {
   }
   console.log(`Harbour is running at http://${host}:${port} · data from ${useSql ? `Azure SQL (${process.env.SQL_DATABASE})` : 'data/BMSData.accdb'}`);
   if (!onAppService) console.log('Keep this window open while using the app. Press Ctrl+C to stop.');
+  register.warm();
 });
 

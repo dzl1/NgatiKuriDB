@@ -27,8 +27,8 @@ Approvers and Admins move a person between phases with **Move to…** on their r
 | Piece | What it is |
 |---|---|
 | `www/` | Public pages: home page, member portal, logo, self-hosted Inter font. |
-| `public/` | Staff pages. `harbour-data.js` loads the data from the API. |
-| `server.js`, `src/` | Node/Express server. Serves the pages and `/api/*`, and checks who is signed in and their role. `src/members.js` holds member registration and approvals. |
+| `public/` | Staff pages. The Applications list loads only names, emails and statuses (`/api/staff/people`), and a person's full record and linked records load when they are opened (`/api/staff/people/:key`). The CSV export is built on the server. |
+| `server.js`, `src/` | Node/Express server. Serves the pages and `/api/*`, and checks who is signed in and their role. `src/register.js` keeps the register in memory, works out how the tables link, and reloads every 5 minutes and straight after Harbour changes the register. `src/members.js` holds member registration and approvals. |
 | Azure SQL `harbour` database | `bms.*`: the register, tables copied from Access with the same names. `app.*`: operators, member accounts, registrations, change requests and the audit log. `meta.Tables`: column definitions. |
 | App Service Authentication | Two sign-in providers. `aad` is staff, using the organisation's Entra ID tenant. `members` is members, using the External ID tenant `ngatikurimembers`. A member sign-in can never act as staff. |
 | Key Vault | Holds the member sign-in client secret. The web app reads it with its managed identity. |

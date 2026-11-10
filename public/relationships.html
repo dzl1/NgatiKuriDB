@@ -6,7 +6,7 @@
   <link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="relationships.css">
 </head>
 <body class="relationships-page">
-  <header class="topbar relationship-topbar"><div class="breadcrumbs"><a href="users.html">Workspace</a><b>/</b><strong>Table relationships</strong></div><div class="top-actions"><a class="access-view-link" href="users.html">♙ People</a><a class="access-view-link" href="access.html">▦ Access-style view</a><span class="privacy"><i></i> Staff only · <a href="/.auth/logout">Sign out</a></span></div></header>
+  <header class="topbar relationship-topbar"><div class="breadcrumbs"><a href="users.html">Workspace</a><b>/</b><strong>Table relationships</strong></div><div class="top-actions"><a class="access-view-link" href="users.html">♙ People</a><a class="access-view-link" href="access.html">▦ Access-style view</a><span class="topbar-session"><a class="home-link" href="/">⌂ Home</a><span data-session="light"></span></span></div></header>
   <main class="relationship-content">
     <div class="relationship-intro"><div><div class="eyebrow"><span class="eyebrow-dot"></span>DATABASE STRUCTURE</div><h1>How your tables connect.</h1><p id="relationshipSubtitle">Loading table definitions and checking for relationships…</p></div><a class="back-link" href="users.html">← Back to tables</a></div>
     <section class="relationship-summary"><span class="summary-icon">⇄</span><div><strong id="summaryTitle">Reading relationship metadata…</strong><p id="summaryText">Checking the database’s saved relationships, then comparing key-like fields.</p></div><button id="reanalyze" class="reanalyze-button">↻ Refresh map</button></section>
@@ -16,5 +16,6 @@
     <footer class="page-footer"><span>Harbour · staff sign-in required.</span><span>HARBOUR <b>·</b> RELATIONSHIP MAP</span></footer>
   </main>
   <script type="module" src="relationships.js"></script>
+ <script type="module" src="/session.js"></script>
 </body>
 </html>

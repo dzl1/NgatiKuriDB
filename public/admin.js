@@ -136,5 +136,4 @@ $('#inviteForm').addEventListener('submit', async (event) => {
   }
 });
 
-api('GET', '/api/me').then((me) => { $('#whoAmI').textContent = me.email || me.name; }).catch(() => {});
 load();

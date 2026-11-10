@@ -76,7 +76,7 @@ function showSimilar(rows) {
       el('thead', {}, el('tr', {}, ...['ID', 'Name', 'DOB', 'Email', 'Address', 'Status', ''].map((text) => el('th', { textContent: text })))),
       el('tbody', {}, ...rows.map((row) => el('tr', {},
         el('td', { className: 'score', textContent: row.ApplicantID }),
-        el('td', { textContent: [row.FirstName, row.MiddleNames, row.LastName].filter(Boolean).join(' ') }),
+        el('td', { textContent: [row.LastName, [row.FirstName, row.MiddleNames].filter(Boolean).join(' ')].filter(Boolean).join(', ') }),
         el('td', { textContent: display(row.DOB) }),
         el('td', { textContent: row.Email || '—' }),
         el('td', { textContent: [row.Address0, row.Address2].filter(Boolean).join(', ') || '—' }),
@@ -157,7 +157,6 @@ async function init() {
 }
 
 api('GET', '/api/me').then((me) => {
-  $('#whoAmI').textContent = me.email || me.name;
   if (me.role === 'Admin') $('#operatorsLink').hidden = false;
 }).catch(() => {});
 init();

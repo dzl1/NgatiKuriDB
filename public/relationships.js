@@ -1,4 +1,4 @@
-import { loadDatabase } from './harbour-data.js';
+import { loadDatabase as fetchDatabase } from './harbour-data.js';
 
 const $ = (selector) => document.querySelector(selector);
 const state = { reader: null, tables: [], records: new Map(), relationships: [] };
@@ -27,7 +27,7 @@ function valueKey(value) {
 async function loadDatabase() {
   say('Reading relationship metadata…', 'Loading the database and checking its saved relationship definitions.');
   try {
-    state.reader = await loadDatabase();
+    state.reader = await fetchDatabase();
     const names = state.reader.getTableNames({ normalTables: true, systemTables: false, linkedTables: false });
     state.tables = names.map((name) => {
       const table = state.reader.getTable(name);

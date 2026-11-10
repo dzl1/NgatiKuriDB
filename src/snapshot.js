@@ -9,13 +9,20 @@ import { includedColumns, listAccessTables, q, ROW_ORDER_COLUMN } from './tables
 export async function snapshotFromSql() {
   const pool = await getPool();
   const meta = await pool.request().query('SELECT Name, IsSystem, ColumnsJson FROM meta.Tables ORDER BY Name');
+  // Read a few tables side by side; more than that gains little on the Basic tier.
+  const queue = [...meta.recordset];
   const tables = [];
-  for (const { Name: name, IsSystem: system, ColumnsJson } of meta.recordset) {
-    const columns = JSON.parse(ColumnsJson);
-    const select = columns.map((column) => q(column.name)).join(', ');
-    const result = await pool.request().query(`SELECT ${select} FROM bms.${q(name)} ORDER BY ${q(ROW_ORDER_COLUMN)}`);
-    tables.push({ name, system, columns, rows: result.recordset });
-  }
+  const worker = async () => {
+    for (let item = queue.shift(); item; item = queue.shift()) {
+      const { Name: name, IsSystem: system, ColumnsJson } = item;
+      const columns = JSON.parse(ColumnsJson);
+      const select = columns.map((column) => q(column.name)).join(', ');
+      const result = await pool.request().query(`SELECT ${select} FROM bms.${q(name)} ORDER BY ${q(ROW_ORDER_COLUMN)}`);
+      tables.push({ name, system, columns, rows: result.recordset });
+    }
+  };
+  await Promise.all([worker(), worker(), worker(), worker()]);
+  tables.sort((a, b) => a.name.localeCompare(b.name));
   return { source: 'Azure SQL', tables };
 }
 

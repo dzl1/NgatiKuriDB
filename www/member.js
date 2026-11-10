@@ -230,7 +230,6 @@ async function load() {
     message(error.message, true);
     return;
   }
-  $('#signOut').hidden = false;
   $('#signedInAs').textContent = state.email ? `Signed in as ${state.email}` : '';
   ({ new: () => registrationForm(), pending, rejected, linked, disabled })[state.state]?.();
 }

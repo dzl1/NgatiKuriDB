@@ -18,12 +18,11 @@
    <div class="record-nav-foot"><span class="local-dot"></span><span><b>Ngāti Kuri database</b><small>Staff sign-in required</small></span></div>
   </aside>
   <main class="users-content">
-   <header class="record-topbar"><div class="breadcrumbs"><span>Applications</span><b>/</b><strong id="viewBreadcrumb">List All</strong></div><span class="privacy"><i></i> Staff only · <a href="/.auth/logout">Sign out</a></span></header>
+   <header class="record-topbar"><div class="breadcrumbs"><span>Applications</span><b>/</b><strong id="viewBreadcrumb">List All</strong></div><span class="topbar-session"><a class="home-link" href="/">⌂ Home</a><span data-session="light"></span></span></header>
    <section class="users-heading"><div><div class="eyebrow"><span class="eyebrow-dot"></span>NGĀTI KURI BENEFICIARY MANAGEMENT</div><h1 id="pageHeading">List All</h1><p id="pageIntro">Every person on the register. Open a profile to see their connected records.</p></div></section>
-   <div id="loadStatus" class="users-load-status">Loading the database…</div>
+   <div id="loadStatus" class="users-load-status">Loading the register…</div>
    <div class="people-workspace">
     <aside class="people-sidebar">
-     <div class="entity-controls"><label for="entityTable">PEOPLE TABLE</label><select id="entityTable" disabled><option>Loading…</option></select><label for="keyField">PERSON KEY</label><select id="keyField" disabled><option>Choose a table first</option></select></div>
      <div class="people-search"><span>⌕</span><input id="peopleSearch" placeholder="Find a person…"><span class="people-total" id="peopleTotal">—</span></div>
      <div class="people-list-actions"><button id="sortNameButton" type="button">Name: A–Z</button><button id="exportUsersButton" type="button" disabled>Export all users</button></div>
      <div class="people-list-actions" id="addPersonRow" hidden><button id="addPersonButton" type="button">+ Add person</button></div>
@@ -37,5 +36,6 @@
   </main>
  </div>
  <script type="module" src="users.js"></script>
+ <script type="module" src="/session.js"></script>
 </body>
 </html>
