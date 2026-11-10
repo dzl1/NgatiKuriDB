@@ -459,3 +459,49 @@ export async function createApplicant(staff, input) {
     throw error;
   }
 }
+
+// ---- Moving an application between phases (Approvers) ----
+
+const STATUS_DATES = { 30: 'ApprovedDate', 40: 'RejectedDate' }; // Registered, Application Rejected
+
+/**
+ * Changes a person's ApplicantStatusID, stamps ApprovedDate/RejectedDate when registering or
+ * declining, and adds a dated line to Notes saying who moved it and why.
+ */
+export async function setApplicantStatus(staff, applicantId, input) {
+  const statusId = Number(input?.statusId);
+  const note = input?.note ? String(input.note).trim().slice(0, 1000) : '';
+  const pool = await getPool();
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+  const request = () => new sql.Request(transaction);
+  try {
+    const statuses = await request().query('SELECT ApplicantStatusID AS id, ApplicantStatus AS label FROM bms.ApplicantStatus');
+    const label = (id) => statuses.recordset.find((row) => row.id === id)?.label ?? `status ${id}`;
+    if (!statuses.recordset.some((row) => row.id === statusId)) throw new MemberError('Choose a status.');
+    const found = await request().input('a', sql.Int, applicantId)
+      .query('SELECT ApplicantStatusID FROM bms.Applicants WITH (UPDLOCK) WHERE ApplicantID = @a');
+    if (!found.recordset.length) throw new MemberError('That person is no longer on the register.', 404);
+    const from = found.recordset[0].ApplicantStatusID;
+    if (from === statusId) throw new MemberError(`They are already “${label(statusId)}”.`);
+
+    const today = new Date().toLocaleDateString('en-NZ', { timeZone: 'Pacific/Auckland', day: 'numeric', month: 'short', year: 'numeric' });
+    const line = `${today}: ${label(from)} → ${label(statusId)} by ${staff.email || staff.name}.${note ? ` ${note}` : ''}`;
+    const dateColumn = STATUS_DATES[statusId];
+    const result = await request()
+      .input('a', sql.Int, applicantId).input('s', sql.SmallInt, statusId).input('line', sql.NVarChar(sql.MAX), line)
+      .query(`
+        UPDATE bms.Applicants
+        SET ApplicantStatusID = @s,
+            Notes = CASE WHEN Notes IS NULL OR Notes = '' THEN @line ELSE CONCAT(Notes, CHAR(10), @line) END,
+            NoteAddedDate = SYSUTCDATETIME()${dateColumn ? `, [${dateColumn}] = SYSUTCDATETIME()` : ''}
+        OUTPUT inserted.ApplicantStatusID, inserted.Notes, inserted.NoteAddedDate, inserted.ApprovedDate, inserted.RejectedDate
+        WHERE ApplicantID = @a`);
+    await transaction.commit();
+    await audit(staff, 'applicant.statusChanged', 'bms.Applicants', String(applicantId), { from, to: statusId, note: note || undefined });
+    return result.recordset[0];
+  } catch (error) {
+    await transaction.rollback().catch(() => {});
+    throw error;
+  }
+}

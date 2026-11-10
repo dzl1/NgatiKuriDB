@@ -167,6 +167,10 @@ app.post('/api/staff/applicants/similar', requireRole('Approver'), async (reques
   if (needSql(response)) return;
   try { response.json(await members.findSimilar(request.body)); } catch (error) { next(error); }
 });
+app.post('/api/staff/applicants/:id/status', requireRole('Approver'), async (request, response, next) => {
+  if (needSql(response)) return;
+  try { response.json(await members.setApplicantStatus(request.user, Number(request.params.id), request.body ?? {})); } catch (error) { next(error); }
+});
 app.post('/api/staff/applicants', requireRole('Approver'), async (request, response, next) => {
   if (needSql(response)) return;
   try { response.status(201).json(await members.createApplicant(request.user, request.body)); } catch (error) { next(error); }

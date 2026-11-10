@@ -2,6 +2,16 @@ import { loadDatabase } from './harbour-data.js';
 
 const $ = (selector) => document.querySelector(selector);
 const state = { reader: null, tables: [], entityTable: null, keyField: null, people: [], selectedKey: null, tableRows: new Map(), rowIndexes: new Map(), relationFields: new Map(), edges: [], groupPages: new Map(), listMode: 'all', nameDescending: false, applicantStatuses: new Map() };
+// Application phases shown under Applications, and the ApplicantStatus each one lists.
+const PHASES = {
+  all: { label: 'List All', intro: 'Every person on the register. Open a profile to see their connected records.', status: null },
+  processing: { label: 'Processing', intro: 'Applications received and being checked.', status: 10 },
+  awaiting: { label: 'Awaiting Information', intro: 'Applications waiting on more information from the applicant.', status: 20 },
+  registered: { label: 'Registered', intro: 'Registered whānau members.', status: 30 },
+  declined: { label: 'Declined', intro: 'Applications that were declined.', status: 40 },
+  cancelled: { label: 'Cancelled', intro: 'Applications that were cancelled.', status: 99 },
+};
+const STATUS_FIELD = 'ApplicantStatusID';
 const PEOPLE_WORDS = /user|person|people|member|contact|profile|account|individual|staff|worker|client|student|customer|participant|beneficiar|applicant|whanau|kaimahi|kaitiaki/i;
 
 function norm(value) { return String(value ?? '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/gi, '').toLowerCase(); }
@@ -152,10 +162,7 @@ function populateKeyPicker(tableName) {
   });
   sorted.forEach((field) => { const option = document.createElement('option'); option.value = field; option.textContent = field; select.append(option); });
   select.disabled = false; select.value = sorted[0] || ''; state.entityTable = tableName; state.keyField = select.value;
-  $('#listDobButton').disabled = !hasDateOfBirthField(table.columns);
-  $('#listDobButton').title = $('#listDobButton').disabled ? 'This table has no recognized date-of-birth field.' : 'Sort entries by date of birth (earliest first).';
-  if (state.listMode === 'dob' && $('#listDobButton').disabled) setListMode('all');
-  else loadPeople();
+  loadPeople();
 }
 
 function personNameParts(record, columns, index) {
@@ -179,44 +186,54 @@ function personNameParts(record, columns, index) {
 }
 
 function personSubline(record, columns, key) {
-  if (state.listMode === 'dob') {
-    const dobField = columns.find((field) => ['dob', 'dateofbirth', 'birthdate'].includes(norm(field)));
-    if (dobField) return `DOB: ${displayValue(record[dobField])}`;
-  }
   const emailColumn = columns.find((field) => /email/i.test(field));
   const email = emailColumn && record[emailColumn] != null ? String(record[emailColumn]) : '';
   return email || `${key}: ${displayValue(record[key])}`;
 }
 
-function loadPeople() {
+function phaseStatus(record) {
+  return record[STATUS_FIELD] == null ? null : Number(record[STATUS_FIELD]);
+}
+
+function updatePhaseCounts() {
+  const table = state.tables.find((item) => item.name === state.entityTable);
+  const rows = table ? getRows(table) : [];
+  const hasStatus = table?.columns.includes(STATUS_FIELD);
+  document.querySelectorAll('#applicationsNav button[data-mode]').forEach((button) => {
+    const phase = PHASES[button.dataset.mode];
+    const count = phase.status === null ? rows.length : hasStatus ? rows.filter((record) => phaseStatus(record) === phase.status).length : 0;
+    button.querySelector('.nav-count').textContent = String(count);
+  });
+}
+
+/** Rebuilds the list for the current phase. Keeps `preferKey` selected if it is still in the list. */
+function loadPeople(preferKey = null) {
   const table = state.tables.find((item) => item.name === state.entityTable);
   if (!table || !state.keyField) return;
   try {
-    const records = getRows(table);
+    const phase = PHASES[state.listMode] ?? PHASES.all;
+    const records = getRows(table).filter((record) => phase.status === null || (table.columns.includes(STATUS_FIELD) && phaseStatus(record) === phase.status));
     state.people = records.map((record, index) => ({ record, key: record[state.keyField], ...personNameParts(record, table.columns, index), index }))
       .filter((person) => token(person.key) !== null)
       .sort((a, b) => {
         const byLastName = a.last.localeCompare(b.last, undefined, { sensitivity: 'base', numeric: true });
         const byFirstName = a.first.localeCompare(b.first, undefined, { sensitivity: 'base', numeric: true });
         const byName = byLastName || byFirstName || a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true });
-        if (state.listMode === 'all') return state.nameDescending ? -byName : byName;
-        const leftDate = dateValue(a.record, table.columns), rightDate = dateValue(b.record, table.columns);
-        if (leftDate === null && rightDate !== null) return 1;
-        if (rightDate === null && leftDate !== null) return -1;
-        return (leftDate ?? 0) - (rightDate ?? 0) || byName;
+        return state.nameDescending ? -byName : byName;
       });
     state.selectedKey = null;
-    $('#peopleSearch').value = '';
+    if (preferKey === null) $('#peopleSearch').value = '';
     renderPeople();
+    updatePhaseCounts();
     $('#exportUsersButton').disabled = state.people.length === 0;
     // ?person=<key> opens that person (used after adding someone, and from duplicate checks).
-    const wanted = new URLSearchParams(window.location.search).get('person');
+    const wanted = preferKey ?? new URLSearchParams(window.location.search).get('person');
     const requested = wanted !== null ? state.people.find((person) => token(person.key) === token(wanted)) : null;
     if (requested) {
       selectPerson(requested.key);
       document.querySelector('.person-list-item.selected')?.scrollIntoView({ block: 'center' });
     } else if (state.people.length) selectPerson(state.people[0].key);
-    else showEmptyDetail('No people found', `The selected key field “${state.keyField}” has no values.`);
+    else showEmptyDetail(`No one in ${phase.label}`, phase.status === null ? `The selected key field “${state.keyField}” has no values.` : 'There are no applications in this phase right now.');
     $('#loadStatus').textContent = '';
   } catch (error) { $('#loadStatus').textContent = `Could not read ${table.name}: ${error.message}`; }
 }
@@ -436,6 +453,51 @@ function recordCategory(group) {
   return 'Other Records';
 }
 
+/** Current status, and for Approvers/Admins a control to move the application to another phase. */
+function statusControl(person) {
+  const box = document.createElement('div'); box.className = 'status-control';
+  const current = document.createElement('span'); current.className = 'status-current';
+  current.textContent = person.record[STATUS_FIELD] == null ? 'No status' : applicantStatusLabel(person.record[STATUS_FIELD]);
+  box.append(current);
+  if (!state.canEdit) return box;
+
+  const phaseFor = (id) => Object.values(PHASES).find((phase) => phase.status === id)?.label;
+  const select = document.createElement('select'); select.setAttribute('aria-label', 'Move to');
+  const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = 'Move to…'; select.append(placeholder);
+  [...state.applicantStatuses.entries()]
+    .map(([key, label]) => ({ id: Number(key), label }))
+    .filter((item) => item.id > 0 && item.id !== phaseStatus(person.record))
+    .sort((a, b) => (phaseFor(b.id) ? 1 : 0) - (phaseFor(a.id) ? 1 : 0) || a.id - b.id)
+    .forEach((item) => { const option = document.createElement('option'); option.value = String(item.id); option.textContent = phaseFor(item.id) ? `${phaseFor(item.id)} — ${item.label}` : item.label; select.append(option); });
+  const note = document.createElement('input'); note.type = 'text'; note.placeholder = 'Note (optional)'; note.maxLength = 1000; note.hidden = true;
+  const move = document.createElement('button'); move.type = 'button'; move.textContent = 'Move'; move.hidden = true;
+  select.addEventListener('change', () => { note.hidden = move.hidden = !select.value; if (select.value) note.focus(); });
+  move.addEventListener('click', async () => {
+    move.disabled = select.disabled = true;
+    try {
+      const applicantId = person.record.ApplicantID ?? person.key;
+      const response = await fetch(`/api/staff/applicants/${encodeURIComponent(applicantId)}/status`, {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Harbour': '1' },
+        body: JSON.stringify({ statusId: Number(select.value), note: note.value.trim() }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || `The server returned ${response.status}.`);
+      // Update the loaded copy so the lists and counts change straight away.
+      for (const field of ['ApplicantStatusID', 'Notes', 'NoteAddedDate', 'ApprovedDate', 'RejectedDate']) {
+        if (field in data && field in person.record) person.record[field] = /Date$/.test(field) && data[field] ? new Date(data[field]) : data[field];
+      }
+      loadPeople(person.key);
+      $('#loadStatus').textContent = `${person.name} moved to ${applicantStatusLabel(data.ApplicantStatusID)}.`;
+    } catch (error) {
+      $('#loadStatus').textContent = error.message;
+      move.disabled = select.disabled = false;
+    }
+  });
+  box.append(select, note, move);
+  return box;
+}
+
 function renderPersonDetail(person, entity, groups) {
   const host = $('#personDetail'); host.replaceChildren();
   const header = document.createElement('header'); header.className = 'person-header';
@@ -444,6 +506,7 @@ function renderPersonDetail(person, entity, groups) {
   const title = document.createElement('h2'); title.textContent = person.name;
   const subtitle = document.createElement('p'); subtitle.textContent = `${entity.name} · ${state.keyField}: ${displayValue(person.key)}`;
   copy.append(title, subtitle); header.append(avatar, copy); host.append(header);
+  if (norm(entity.name) === 'applicants' && entity.columns.includes(STATUS_FIELD)) header.append(statusControl(person));
 
   const categories = ['Contact Details', 'Attachments', 'Emails', 'All Notes', 'Funding Applications', 'Other Records'];
   const categorized = new Map(categories.map((label) => [label, []]));
@@ -529,10 +592,11 @@ async function init() {
 $('#entityTable').addEventListener('change', (event) => populateKeyPicker(event.target.value));
 $('#keyField').addEventListener('change', (event) => { state.keyField = event.target.value; loadPeople(); });
 $('#peopleSearch').addEventListener('input', renderPeople);
-$('#listAllButton').addEventListener('click', () => setListMode('all'));
-$('#listDobButton').addEventListener('click', () => setListMode('dob'));
+$('#applicationsNav').addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-mode]');
+  if (button) setListMode(button.dataset.mode);
+});
 $('#sortNameButton').addEventListener('click', () => {
-  if (state.listMode !== 'all') setListMode('all');
   state.nameDescending = !state.nameDescending;
   $('#sortNameButton').textContent = `Name: ${state.nameDescending ? 'Z–A' : 'A–Z'}`;
   loadPeople();
@@ -540,23 +604,19 @@ $('#sortNameButton').addEventListener('click', () => {
 $('#exportUsersButton').addEventListener('click', exportAllUsers);
 
 function setListMode(mode) {
-  if (mode === 'dob') {
-    const table = state.tables.find((item) => item.name === state.entityTable);
-    if (!table || !hasDateOfBirthField(table.columns)) {
-      $('#loadStatus').textContent = 'List by DOB is unavailable because the selected people table has no recognized date-of-birth field.';
-      return;
-    }
-  }
-  state.listMode = mode;
-  $('#listAllButton').classList.toggle('active', mode === 'all');
-  $('#listDobButton').classList.toggle('active', mode === 'dob');
-  $('#viewBreadcrumb').textContent = mode === 'dob' ? 'List by DOB' : 'List All';
-  $('#pageHeading').textContent = mode === 'dob' ? 'List by DOB' : 'List All';
-  $('#peopleListLabel').textContent = mode === 'dob' ? 'Sorted by date of birth' : 'All database entries';
-  $('#sortNameButton').hidden = mode === 'dob';
-  if (mode === 'all') $('#sortNameButton').textContent = `Name: ${state.nameDescending ? 'Z–A' : 'A–Z'}`;
+  const phase = PHASES[mode] ?? PHASES.all;
+  state.listMode = PHASES[mode] ? mode : 'all';
+  document.querySelectorAll('#applicationsNav button[data-mode]').forEach((button) => button.classList.toggle('active', button.dataset.mode === state.listMode));
+  $('#viewBreadcrumb').textContent = phase.label;
+  $('#pageHeading').textContent = phase.label;
+  $('#pageIntro').textContent = phase.intro;
+  $('#peopleListLabel').textContent = phase.status === null ? 'All database entries' : `${phase.label} applications`;
   if (state.entityTable && state.keyField) loadPeople();
 }
+
+// ?view=processing (etc.) opens a phase directly.
+const initialView = new URLSearchParams(window.location.search).get('view');
+if (initialView && PHASES[initialView]) setListMode(initialView);
 
 init();
 
@@ -565,6 +625,8 @@ fetch('/api/me', { credentials: 'same-origin' })
   .then((response) => (response.ok ? response.json() : null))
   .then((me) => {
     if (me?.role === 'Admin' || me?.role === 'Approver') {
+      state.canEdit = true;
+      if (state.selectedKey !== null) selectPerson(state.selectedKey);
       $('#maintenanceNav').hidden = false;
       $('#addPersonRow').hidden = false;
       $('#addPersonNav').hidden = false;

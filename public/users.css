@@ -5,3 +5,12 @@
 .people-list-actions{display:flex;gap:6px;padding:0 10px 8px}.people-list-actions button{min-height:27px;flex:1;padding:4px 6px;border:1px solid #dfe4dc;border-radius:4px;background:#fff;color:#566456;font:9px var(--font);cursor:pointer;white-space:nowrap}.people-list-actions button:hover:not(:disabled){border-color:#b9c9b8;background:#f3f7f2;color:#285d47}.people-list-actions button:disabled{opacity:.55;cursor:default}.people-list-actions #exportUsersButton{background:#285d47;border-color:#285d47;color:#fff}.people-list-actions #exportUsersButton:hover:not(:disabled){background:#214b3a}.people-list-actions button[hidden]{display:none}.record-subnav button:disabled{opacity:.45;cursor:default}
 
 .people-list-actions[hidden]{display:none}
+.nav-count{float:right;font:9px var(--mono);color:#8a9389;margin-left:6px}.record-subnav button.active .nav-count{color:#285d47}
+.status-control{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:6px;margin-left:auto;max-width:420px}
+.status-current{font:600 10px var(--font);color:#285d47;background:#e8efe6;border-radius:10px;padding:4px 9px;white-space:nowrap}
+.status-control select,.status-control input{height:28px;border:1px solid #d9ded6;border-radius:4px;background:#fff;color:#343d35;padding:0 6px;font:10px var(--font);min-width:0}
+.status-control input{width:150px}
+.status-control button{height:28px;border:1px solid #285d47;border-radius:4px;background:#285d47;color:#fff;padding:0 10px;font:600 10px var(--font);cursor:pointer}
+.status-control button:disabled,.status-control select:disabled{opacity:.55;cursor:default}
+.status-control [hidden]{display:none}
+@media(max-width:620px){.status-control{margin-left:0;justify-content:flex-start;width:100%}}

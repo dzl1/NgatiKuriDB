@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"><meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noai, noimageai"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f7f6f2">
-  <title>Harbour — Database Entries</title>
+  <title>Harbour — Applications</title>
   <link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="users.css">
   <style>.profile-fields[hidden]{display:none}</style>
 </head>
@@ -12,15 +12,14 @@
    <a class="record-brand" href="users.html"><span class="record-brand-mark">H</span><span>Harbour</span></a>
    <div class="record-nav-label">MAIN MENU</div>
    <button class="record-nav-item" type="button"><span>◷</span>Today</button>
-   <details class="record-nav-group"><summary><span>▤</span>Applications</summary><div class="record-subnav"><button type="button">Processing</button><button type="button">Awaiting Information</button><button type="button">Registered</button><button type="button">Declined</button><button type="button">Cancelled</button></div></details>
-   <details class="record-nav-group" open><summary><span>▦</span>Database Entries</summary><div class="record-subnav"><button id="listAllButton" class="active" type="button">List All</button><button id="listDobButton" type="button">List by DOB</button><button id="addPersonNav" type="button" hidden>Add person</button></div></details>
+   <details class="record-nav-group" open><summary><span>▤</span>Applications</summary><div class="record-subnav" id="applicationsNav"><button id="listAllButton" class="active" type="button" data-mode="all">List All<span class="nav-count"></span></button><button type="button" data-mode="processing">Processing<span class="nav-count"></span></button><button type="button" data-mode="awaiting">Awaiting Information<span class="nav-count"></span></button><button type="button" data-mode="registered">Registered<span class="nav-count"></span></button><button type="button" data-mode="declined">Declined<span class="nav-count"></span></button><button type="button" data-mode="cancelled">Cancelled<span class="nav-count"></span></button><button id="addPersonNav" type="button" hidden>Add person</button></div></details>
    <details class="record-nav-group" id="maintenanceNav" hidden><summary><span>⚙</span>Maintenance</summary><div class="record-subnav"><button id="reviewButton" type="button">Member requests</button><button id="operatorsButton" type="button" hidden>Operators</button></div></details>
    <details class="record-nav-group"><summary><span>▥</span>Reports</summary><div class="record-subnav"><button type="button">Export to Excel</button></div></details>
    <div class="record-nav-foot"><span class="local-dot"></span><span><b>Ngāti Kuri database</b><small>Staff sign-in required</small></span></div>
   </aside>
   <main class="users-content">
-   <header class="record-topbar"><div class="breadcrumbs"><span>Database Entries</span><b>/</b><strong id="viewBreadcrumb">List All</strong></div><span class="privacy"><i></i> Staff only · <a href="/.auth/logout">Sign out</a></span></header>
-   <section class="users-heading"><div><div class="eyebrow"><span class="eyebrow-dot"></span>NGĀTI KURI BENEFICIARY MANAGEMENT</div><h1 id="pageHeading">List All</h1><p>Browse every database entry and open a profile to see its connected records.</p></div></section>
+   <header class="record-topbar"><div class="breadcrumbs"><span>Applications</span><b>/</b><strong id="viewBreadcrumb">List All</strong></div><span class="privacy"><i></i> Staff only · <a href="/.auth/logout">Sign out</a></span></header>
+   <section class="users-heading"><div><div class="eyebrow"><span class="eyebrow-dot"></span>NGĀTI KURI BENEFICIARY MANAGEMENT</div><h1 id="pageHeading">List All</h1><p id="pageIntro">Every person on the register. Open a profile to see their connected records.</p></div></section>
    <div id="loadStatus" class="users-load-status">Loading the database…</div>
    <div class="people-workspace">
     <aside class="people-sidebar">
@@ -34,7 +33,7 @@
     <section class="person-detail" id="personDetail"><div class="person-empty"><span>♙</span><strong>Select a person</strong><small>Choose someone from the list to see their profile and related records.</small></div></section>
    </div>
    <div class="people-note"><span>ⓘ</span><p>Related records are gathered through saved database relationships and matching person keys. Tables without a clear profile category remain available under Other Records.</p></div>
-   <footer class="page-footer"><span>Harbour · staff sign-in required.</span><span>HARBOUR <b>·</b> DATABASE ENTRIES</span></footer>
+   <footer class="page-footer"><span>Harbour · staff sign-in required.</span><span>HARBOUR <b>·</b> APPLICATIONS</span></footer>
   </main>
  </div>
  <script type="module" src="users.js"></script>
