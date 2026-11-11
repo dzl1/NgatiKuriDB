@@ -4,7 +4,7 @@
 // in memory and works out how the tables link, so this page stays small and quick.
 
 const $ = (selector) => document.querySelector(selector);
-const state = { table: 'Applicants', keyField: 'ApplicantID', all: [], people: [], selectedKey: null, details: new Map(), listMode: 'all', nameDescending: false, applicantStatuses: new Map(), canEdit: false };
+const state = { table: 'Applicants', keyField: 'ApplicantID', all: [], people: [], selectedKey: null, details: new Map(), listMode: 'all', nameDescending: false, applicantStatuses: new Map(), canEdit: false, canDelete: false };
 // Application phases shown under Applications, and the ApplicantStatus each one lists.
 const PHASES = {
   all: { label: 'List All', intro: 'Every person on the register. Open a profile to see their connected records.', status: null },
@@ -242,6 +242,191 @@ function statusControl(person, detail) {
   return box;
 }
 
+// ---- Editing a record (Approvers and Admins) ----
+
+async function sendJson(method, url, body) {
+  const response = await fetch(url, {
+    method, credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', 'X-Harbour': '1' },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || `The server returned ${response.status}.`);
+  return data;
+}
+
+function editorControl(field, value) {
+  const id = `edit_${field.name}`;
+  let input;
+  if (field.type === 'boolean') {
+    input = document.createElement('input'); input.type = 'checkbox'; input.checked = Boolean(value);
+  } else if (field.type === 'choice') {
+    input = document.createElement('select');
+    const options = [...field.options];
+    // Keep an old value the list does not offer (for example a code from Access), so saving does not change it.
+    if (value != null && !options.some(([key]) => key === value)) options.push([value, `${value} (as recorded)`]);
+    options.forEach(([key, label]) => { const option = document.createElement('option'); option.value = key; option.textContent = label; input.append(option); });
+    input.value = value ?? '';
+  } else {
+    input = document.createElement('input');
+    input.type = field.type === 'date' ? 'date' : field.type === 'email' ? 'email' : 'text';
+    input.value = value ?? '';
+    if (field.max) input.maxLength = field.max;
+    if (field.type === 'date' && !field.future) input.max = new Date().toISOString().slice(0, 10);
+  }
+  input.id = id; input.name = field.name;
+  const label = document.createElement('label'); label.className = `edit-field${field.type === 'boolean' ? ' edit-check' : ''}`; label.htmlFor = id;
+  const text = document.createElement('span'); text.textContent = `${field.label}${field.required ? ' *' : ''}`;
+  if (field.type === 'boolean') label.append(input, text); else label.append(text, input);
+  return label;
+}
+
+function editorValue(field, input) {
+  if (field.type === 'boolean') return input.checked;
+  const text = input.value.trim();
+  return text || null;
+}
+
+async function openEditor(person, detail) {
+  const applicantId = detail.record.ApplicantID ?? person.key;
+  const host = $('#personDetail');
+  showEmptyDetail(`Edit ${person.name}`, 'Loading the latest values…');
+  let data;
+  try {
+    const response = await fetch(`/api/staff/applicants/${encodeURIComponent(applicantId)}/edit`, { credentials: 'same-origin' });
+    data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || `The server returned ${response.status}.`);
+  } catch (error) {
+    showEmptyDetail('Could not open the editor', error.message);
+    return;
+  }
+  if (token(state.selectedKey) !== token(person.key)) return;
+
+  const form = document.createElement('form'); form.className = 'record-editor'; form.noValidate = true;
+  const head = document.createElement('header'); head.className = 'person-header';
+  const copy = document.createElement('div'); copy.className = 'person-heading-copy';
+  const title = document.createElement('h2'); title.textContent = `Edit ${person.name}`;
+  const sub = document.createElement('p'); sub.textContent = `${detail.table.name} · ${detail.keyField}: ${applicantId}. Status is changed with “Move to…”.`;
+  copy.append(title, sub); head.append(copy); form.append(head);
+
+  const message = document.createElement('div'); message.className = 'editor-message'; message.setAttribute('role', 'status');
+  const grid = document.createElement('div'); grid.className = 'edit-grid';
+  data.fields.forEach((field) => grid.append(editorControl(field, data.values[field.name])));
+  const noteLabel = document.createElement('label'); noteLabel.className = 'edit-field edit-wide'; noteLabel.htmlFor = 'edit_note';
+  const noteText = document.createElement('span'); noteText.textContent = 'Add a note (optional; added to Notes with today’s date and your name)';
+  const note = document.createElement('textarea'); note.id = 'edit_note'; note.maxLength = 1000; note.rows = 2;
+  noteLabel.append(noteText, note); grid.append(noteLabel);
+
+  const actions = document.createElement('div'); actions.className = 'editor-actions';
+  const save = document.createElement('button'); save.type = 'submit'; save.className = 'editor-save'; save.textContent = 'Save changes';
+  const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'editor-cancel'; cancel.textContent = 'Cancel';
+  cancel.addEventListener('click', () => renderPersonDetail(person, detail));
+  actions.append(save, cancel);
+  form.append(message, grid, actions);
+
+  form.addEventListener('input', (event) => {
+    const field = data.fields.find((item) => item.name === event.target.name);
+    if (field) event.target.closest('.edit-field').classList.toggle('changed', editorValue(field, event.target) !== data.values[field.name]);
+  });
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const changes = {}, original = {};
+    for (const field of data.fields) {
+      const input = form.elements.namedItem(field.name);
+      if (input.type !== 'checkbox' && !input.checkValidity()) { message.textContent = `Check “${field.label}”.`; message.classList.add('error'); input.focus(); return; }
+      const value = editorValue(field, input);
+      if (value !== data.values[field.name]) { changes[field.name] = value; original[field.name] = data.values[field.name]; }
+    }
+    if (!Object.keys(changes).length && !note.value.trim()) { message.textContent = 'You have not changed anything yet.'; message.classList.add('error'); return; }
+    save.disabled = cancel.disabled = true; message.classList.remove('error'); message.textContent = 'Saving…';
+    try {
+      await sendJson('PATCH', `/api/staff/applicants/${encodeURIComponent(applicantId)}`, { changes, original, note: note.value.trim() });
+      // Refresh the list entry and fetch the saved record.
+      const values = { ...data.values, ...changes };
+      Object.assign(person, makePerson([person.key, values.FirstName, values.MiddleNames, values.LastName, values.Email, person.status], 0));
+      state.details.delete(token(person.key));
+      loadPeople(person.key);
+      $('#loadStatus').textContent = `Saved changes to ${person.name}.`;
+    } catch (error) {
+      message.textContent = error.message; message.classList.add('error');
+      save.disabled = cancel.disabled = false;
+    }
+  });
+  host.replaceChildren(form);
+  form.querySelector('input,select')?.focus();
+}
+
+// ---- Deleting a record (Admins only) ----
+
+function confirmDelete(person, detail) {
+  const applicantId = detail.record.ApplicantID ?? person.key;
+  const dialog = document.createElement('dialog'); dialog.className = 'delete-dialog';
+  const title = document.createElement('h2'); title.textContent = `Delete ${person.name}?`;
+  const body = document.createElement('div'); body.className = 'delete-summary'; body.textContent = 'Checking what is linked to this record…';
+  const form = document.createElement('form'); form.method = 'dialog'; form.className = 'delete-form';
+  const reasonLabel = document.createElement('label'); reasonLabel.htmlFor = 'delete_reason'; reasonLabel.textContent = 'Reason (optional, kept in the audit log)';
+  const reason = document.createElement('textarea'); reason.id = 'delete_reason'; reason.rows = 2; reason.maxLength = 1000;
+  const typeLabel = document.createElement('label'); typeLabel.htmlFor = 'delete_confirm'; typeLabel.innerHTML = 'Type <b>DELETE</b> to confirm';
+  const typed = document.createElement('input'); typed.id = 'delete_confirm'; typed.autocomplete = 'off'; typed.spellcheck = false;
+  const message = document.createElement('p'); message.className = 'editor-message'; message.setAttribute('role', 'status');
+  const actions = document.createElement('div'); actions.className = 'editor-actions';
+  const go = document.createElement('button'); go.type = 'submit'; go.className = 'delete-confirm-button'; go.textContent = 'Delete permanently'; go.disabled = true;
+  const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'editor-cancel'; cancel.textContent = 'Cancel';
+  actions.append(go, cancel);
+  form.append(reasonLabel, reason, typeLabel, typed, message, actions);
+  dialog.append(title, body, form);
+  document.body.append(dialog);
+  let ready = false, busy = false;
+  const update = () => { go.disabled = busy || !ready || typed.value.trim().toUpperCase() !== 'DELETE'; };
+  typed.addEventListener('input', update);
+  cancel.addEventListener('click', () => dialog.close());
+  dialog.addEventListener('cancel', (event) => { if (busy) event.preventDefault(); });
+  dialog.addEventListener('close', () => dialog.remove());
+  dialog.showModal();
+  cancel.focus();
+
+  getJson(`/api/staff/applicants/${encodeURIComponent(applicantId)}/delete`).then((summary) => {
+    body.replaceChildren();
+    const lead = document.createElement('p'); lead.innerHTML = '<strong>This cannot be undone.</strong> ';
+    lead.append(`${summary.name} (ApplicantID ${summary.applicantId}) will be removed from the register.`);
+    body.append(lead);
+    const items = [...summary.related.map((item) => `${item.count} ${item.label}`)];
+    if (summary.memberLogin.length) items.push(`Their member login (${summary.memberLogin.join(', ')}) will be unlinked; they can register again`);
+    if (summary.pendingRequests) items.push(`${summary.pendingRequests} change request${summary.pendingRequests === 1 ? '' : 's'} waiting for review will be closed`);
+    if (items.length) {
+      const also = document.createElement('p'); also.textContent = 'Also removed with them:'; body.append(also);
+      const list = document.createElement('ul'); items.forEach((text) => { const li = document.createElement('li'); li.textContent = text; list.append(li); }); body.append(list);
+      if (summary.related.some((item) => item.label.startsWith('family link'))) {
+        const note = document.createElement('p'); note.className = 'dialog-note'; note.textContent = 'Removing family links does not remove the other people in them.'; body.append(note);
+      }
+    } else {
+      const none = document.createElement('p'); none.textContent = 'Nothing else in the register is linked to them.'; body.append(none);
+    }
+    ready = true; update(); typed.focus();
+  }).catch((error) => { body.textContent = error.message; body.classList.add('error'); });
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (go.disabled) return;
+    busy = true; update(); cancel.disabled = true; message.classList.remove('error'); message.textContent = 'Deleting…';
+    try {
+      await sendJson('DELETE', `/api/staff/applicants/${encodeURIComponent(applicantId)}`, { confirm: true, reason: reason.value.trim() });
+      const index = state.people.findIndex((item) => token(item.key) === token(person.key));
+      const next = state.people[index + 1] ?? state.people[index - 1] ?? null;
+      state.all = state.all.filter((item) => token(item.key) !== token(person.key));
+      state.details.delete(token(person.key));
+      const url = new URL(window.location.href);
+      if (url.searchParams.has('person')) { url.searchParams.delete('person'); history.replaceState(null, '', url); }
+      busy = false; dialog.close();
+      loadPeople(next ? next.key : null);
+      $('#loadStatus').textContent = `Deleted ${person.name} from the register.`;
+    } catch (error) {
+      busy = false; cancel.disabled = false; update();
+      message.textContent = error.message; message.classList.add('error');
+    }
+  });
+}
+
 function renderPersonDetail(person, detail) {
   const entity = detail.table;
   const host = $('#personDetail'); host.replaceChildren();
@@ -251,6 +436,16 @@ function renderPersonDetail(person, detail) {
   const title = document.createElement('h2'); title.textContent = person.name;
   const subtitle = document.createElement('p'); subtitle.textContent = `${entity.name} · ${detail.keyField}: ${displayValue(person.key)}`;
   copy.append(title, subtitle); header.append(avatar, copy); host.append(header);
+  if (state.canEdit && norm(entity.name) === 'applicants') {
+    const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'edit-record-button'; edit.textContent = 'Edit record';
+    edit.addEventListener('click', () => openEditor(person, detail));
+    header.append(edit);
+  }
+  if (state.canDelete && norm(entity.name) === 'applicants') {
+    const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'delete-record-button'; remove.textContent = 'Delete';
+    remove.addEventListener('click', () => confirmDelete(person, detail));
+    header.append(remove);
+  }
   if (norm(entity.name) === 'applicants' && entity.columns.includes(STATUS_FIELD)) header.append(statusControl(person, detail));
 
   const categories = ['Contact Details', 'Attachments', 'Emails', 'All Notes', 'Funding Applications', 'Other Records'];
@@ -400,7 +595,11 @@ fetch('/api/me', { credentials: 'same-origin' })
       $('#addPersonRow').hidden = false;
       $('#addPersonNav').hidden = false;
     }
-    if (me?.role === 'Admin') $('#operatorsButton').hidden = false;
+    if (me?.role === 'Admin') {
+      $('#operatorsButton').hidden = false;
+      state.canDelete = true;
+      if (state.selectedKey !== null) selectPerson(state.selectedKey);
+    }
   })
   .catch(() => {});
 $('#operatorsButton').addEventListener('click', () => { window.location.href = 'admin.html'; });

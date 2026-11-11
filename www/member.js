@@ -93,8 +93,9 @@ function signedOut() {
     el('div', { className: 'form-actions' }, el('a', { className: 'button button-green', href: LOGIN, textContent: 'Register or sign in' }))));
 }
 
-function registrationForm(previous) {
-  setHeading('Register with Ngāti Kuri', 'Tell us about yourself and your whakapapa. Fields marked * are needed.');
+function registrationForm(previous, { editing = false } = {}) {
+  if (editing) setHeading('Change my registration', 'Update anything that needs fixing. Fields marked * are needed. Our team has not checked it yet, so your changes replace what you sent.');
+  else setHeading('Register with Ngāti Kuri', 'Tell us about yourself and your whakapapa. Fields marked * are needed.');
   const prefill = { FirstName: state.givenName, LastName: state.familyName, Email: state.email, ...(previous ?? {}) };
   const form = el('form', { className: 'panel', noValidate: true },
     el('h2', { textContent: 'About you' }),
@@ -105,7 +106,9 @@ function registrationForm(previous) {
     el('label', { className: 'consent' },
       el('input', { type: 'checkbox', name: 'Consent', required: true }),
       el('span', { textContent: 'I confirm these details are true, and I agree to the Ngāti Kuri Trust Board holding them for the iwi register and contacting me about iwi matters.' })),
-    el('div', { className: 'form-actions' }, el('button', { className: 'button button-green', type: 'submit', textContent: 'Send my registration' })));
+    el('div', { className: 'form-actions' },
+      el('button', { className: 'button button-green', type: 'submit', textContent: editing ? 'Save my changes' : 'Send my registration' }),
+      editing ? el('button', { className: 'button button-quiet', type: 'button', textContent: 'Cancel', onclick: () => { message(''); pending(); } }) : null));
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -118,8 +121,8 @@ function registrationForm(previous) {
     const button = form.querySelector('button[type=submit]');
     button.disabled = true;
     try {
-      await api('POST', '/api/member/registration', { ...formValues(form, [...state.fields, ...state.extra]), Consent: form.elements.namedItem('Consent').checked });
-      message('Thank you. We have your registration.');
+      await api(editing ? 'PUT' : 'POST', '/api/member/registration', { ...formValues(form, [...state.fields, ...state.extra]), Consent: form.elements.namedItem('Consent').checked });
+      message(editing ? 'Thank you. Your registration has been updated.' : 'Thank you. We have your registration.');
       await load();
     } catch (error) {
       message(error.message, true);
@@ -134,7 +137,8 @@ function pending() {
   $('#content').replaceChildren(el('div', { className: 'panel' },
     el('h2', { textContent: 'What happens next' }),
     el('p', { textContent: 'If you are already on the register, we link your account to your existing record. If you are not, we add you. Once that is done you can see your details here and ask for changes.' }),
-    el('p', { textContent: 'Need to change something you sent? Contact us at enquiries@ngatikuri.iwi.nz.' })));
+    el('p', { textContent: 'Need to change something you sent? You can until our team has checked it.' }),
+    el('div', { className: 'form-actions' }, el('button', { className: 'button button-green', type: 'button', textContent: 'Change my registration', onclick: () => { message(''); registrationForm(state.details, { editing: true }); } }))));
 }
 
 function rejected() {

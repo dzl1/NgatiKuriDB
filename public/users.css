@@ -14,3 +14,39 @@
 .status-control button:disabled,.status-control select:disabled{opacity:.55;cursor:default}
 .status-control [hidden]{display:none}
 @media(max-width:620px){.status-control{margin-left:0;justify-content:flex-start;width:100%}}
+.edit-record-button{height:28px;border:1px solid #cfd8cc;border-radius:4px;background:#fff;color:#285d47;padding:0 10px;font:600 10px var(--font);cursor:pointer;white-space:nowrap}
+.edit-record-button:hover{background:#eef3ec}
+.record-editor .person-header{border-bottom:1px solid #eceee8}
+.editor-message{margin:12px 18px 0;font-size:11px;color:#285d47}
+.editor-message:empty{display:none}
+.editor-message.error{color:#9b4a35}
+.edit-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 18px;padding:14px 18px}
+.edit-field{display:flex;flex-direction:column;gap:4px;min-width:0;font-size:10px;color:#858d84}
+.edit-field input,.edit-field select,.edit-field textarea{height:30px;border:1px solid #d9ded6;border-radius:4px;background:#fff;color:#343d35;padding:0 8px;font:11px var(--font);min-width:0}
+.edit-field textarea{height:auto;padding:6px 8px;resize:vertical}
+.edit-field.changed input,.edit-field.changed select,.edit-field.changed textarea{border-color:#c79a3e;background:#fffaf0}
+.edit-check{flex-direction:row;align-items:center;gap:8px;padding-top:18px;color:#343d35;font-size:11px}
+.edit-check input{width:16px;height:16px}
+.edit-check.changed span{color:#9a6a12;font-weight:600}
+.edit-wide{grid-column:1/-1}
+.editor-actions{display:flex;gap:8px;padding:0 18px 18px}
+.editor-save{height:32px;border:0;border-radius:4px;background:#285d47;color:#fff;padding:0 14px;font:600 11px var(--font);cursor:pointer}
+.editor-save:disabled,.editor-cancel:disabled{opacity:.6;cursor:default}
+.editor-cancel{height:32px;border:1px solid #d9ded6;border-radius:4px;background:#fff;color:#4e584e;padding:0 14px;font:11px var(--font);cursor:pointer}
+@media(max-width:800px){.edit-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:580px){.edit-grid{grid-template-columns:1fr;padding:10px}.editor-actions{padding:0 10px 14px}}
+.delete-record-button{height:28px;border:1px solid #e3c5bd;border-radius:4px;background:#fff;color:#a34e42;padding:0 10px;font:600 10px var(--font);cursor:pointer;white-space:nowrap}
+.delete-record-button:hover{background:#fbefec}
+.delete-dialog{width:min(480px,calc(100% - 32px))}
+.delete-dialog h2{margin-top:0}
+.delete-summary p,.delete-summary li{color:#5f665f}
+.delete-summary strong{color:#a34e42}
+.delete-summary ul{margin:6px 0 12px;padding-left:19px;font-size:12px}
+.delete-summary.error{color:#a34e42;font-size:12px}
+.delete-form{display:flex;flex-direction:column;gap:6px;margin-top:14px}
+.delete-form label{font-size:11px;color:#6b726b}
+.delete-form textarea,.delete-form input{border:1px solid #dcdfd8;border-radius:5px;padding:8px;font:13px var(--font);width:100%}
+.delete-form .editor-actions{margin-top:8px;padding:0}
+.delete-form .editor-message{margin:4px 0 0}
+.delete-confirm-button{height:32px;border:0;border-radius:5px;background:#a34e42;color:#fff;padding:0 14px;font:600 12px var(--font);cursor:pointer}
+.delete-confirm-button:disabled{opacity:.45;cursor:not-allowed}

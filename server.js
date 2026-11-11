@@ -211,6 +211,9 @@ app.get('/api/member/me', requireMember, async (request, response, next) => {
 app.post('/api/member/registration', requireMember, async (request, response, next) => {
   try { await members.submitRegistration(request.member, request.body); response.status(201).json({ ok: true }); } catch (error) { next(error); }
 });
+app.put('/api/member/registration', requireMember, async (request, response, next) => {
+  try { await members.updateRegistration(request.member, request.body); response.json({ ok: true }); } catch (error) { next(error); }
+});
 app.post('/api/member/changes', requireMember, async (request, response, next) => {
   try { await members.submitChange(request.member, request.body); response.status(201).json({ ok: true }); } catch (error) { next(error); }
 });
@@ -250,6 +253,25 @@ app.post('/api/staff/applicants/similar', requireRole('Approver'), async (reques
 app.post('/api/staff/applicants/:id/status', requireRole('Approver'), async (request, response, next) => {
   if (needSql(response)) return;
   try { const result = await members.setApplicantStatus(request.user, Number(request.params.id), request.body ?? {}); register.invalidate(); response.json(result); } catch (error) { next(error); }
+});
+// Editing a person's record directly (Approvers and Admins). The editor reads fresh values, and a
+// save is refused if someone else changed the same fields meanwhile.
+app.get('/api/staff/applicants/:id/edit', requireRole('Approver'), async (request, response, next) => {
+  if (needSql(response)) return;
+  try { response.set('Cache-Control', 'no-store').json(await members.applicantForEdit(Number(request.params.id))); } catch (error) { next(error); }
+});
+app.patch('/api/staff/applicants/:id', requireRole('Approver'), async (request, response, next) => {
+  if (needSql(response)) return;
+  try { const result = await members.updateApplicant(request.user, Number(request.params.id), request.body ?? {}); register.invalidate(); response.json(result); } catch (error) { next(error); }
+});
+// Deleting a person (Admins only). The page shows what will go and asks for confirmation first.
+app.get('/api/staff/applicants/:id/delete', requireRole('Admin'), async (request, response, next) => {
+  if (needSql(response)) return;
+  try { response.set('Cache-Control', 'no-store').json(await members.deletionSummary(Number(request.params.id))); } catch (error) { next(error); }
+});
+app.delete('/api/staff/applicants/:id', requireRole('Admin'), async (request, response, next) => {
+  if (needSql(response)) return;
+  try { const result = await members.deleteApplicant(request.user, Number(request.params.id), request.body ?? {}); register.invalidate(); response.json(result); } catch (error) { next(error); }
 });
 app.post('/api/staff/applicants', requireRole('Approver'), async (request, response, next) => {
   if (needSql(response)) return;

@@ -151,6 +151,8 @@ export async function memberState(identity) {
   const latest = registration.recordset[0];
   if (!latest) return { ...base, state: 'new' };
   if (latest.Status === 'pending') return { ...base, state: 'pending', submittedAt: latest.SubmittedAt, details: JSON.parse(latest.DetailsJson) };
+  // Accepted before, but no longer linked (their record was removed): they can register again.
+  if (latest.Status !== 'rejected') return { ...base, state: 'new' };
   return { ...base, state: 'rejected', reviewNote: latest.ReviewNote, details: JSON.parse(latest.DetailsJson) };
 }
 
@@ -500,6 +502,246 @@ export async function setApplicantStatus(staff, applicantId, input) {
     await transaction.commit();
     await audit(staff, 'applicant.statusChanged', 'bms.Applicants', String(applicantId), { from, to: statusId, note: note || undefined });
     return result.recordset[0];
+  } catch (error) {
+    await transaction.rollback().catch(() => {});
+    throw error;
+  }
+}
+
+// ---- Staff editing a person's record directly (Approvers and Admins) ----
+
+/**
+ * Fields staff may edit on bms.Applicants. Status has its own control (Move to…); IDs, dates
+ * Harbour stamps itself, and links to other tables are not edited here. Text limits match Access.
+ */
+export const STAFF_EDIT_FIELDS = [
+  { name: 'FirstName', label: 'First name', max: 50, required: true },
+  { name: 'MiddleNames', label: 'Middle names', max: 60 },
+  { name: 'LastName', label: 'Last name', max: 50, required: true },
+  { name: 'DOB', label: 'Date of birth', type: 'date' },
+  { name: 'Gender', label: 'Gender', type: 'choice', options: [['', 'Not recorded'], ['F', 'Female'], ['M', 'Male'], ['G', 'Gender diverse']] },
+  { name: 'Address0', label: 'Address line 1', max: 50 },
+  { name: 'Address1', label: 'Address line 2 (suburb)', max: 50 },
+  { name: 'Address2', label: 'Town or city, postcode', max: 50 },
+  { name: 'Address3', label: 'Country', max: 50 },
+  { name: 'PhoneNumber', label: 'Phone', max: 20 },
+  { name: 'Mobile', label: 'Mobile', max: 20 },
+  { name: 'FaxNumber', label: 'Fax', max: 20 },
+  { name: 'Email', label: 'Email', max: 100, type: 'email' },
+  { name: 'Constituancy', label: 'Constituency code', max: 1 },
+  { name: 'Deceased', label: 'Deceased', type: 'boolean' },
+  { name: 'DeceasedDate', label: 'Date of death', type: 'date' },
+  { name: 'Inactive', label: 'Inactive', type: 'boolean' },
+  { name: 'FollowupDate', label: 'Follow-up date', type: 'date', future: true },
+];
+const STAFF_FIELD = new Map(STAFF_EDIT_FIELDS.map((field) => [field.name, field]));
+
+/** A stored value in the form the edit screen uses: dates as YYYY-MM-DD, booleans, text as stored. */
+function staffValue(field, value) {
+  if (field.type === 'boolean') return Boolean(value);
+  if (value === null || value === undefined || value === '') return null;
+  if (field.type === 'date') return new Date(value).toISOString().slice(0, 10);
+  return String(value);
+}
+
+function cleanStaffValue(field, raw) {
+  if (field.type === 'boolean') {
+    if (typeof raw !== 'boolean') throw new MemberError(`${field.label}: choose yes or no.`);
+    return raw;
+  }
+  if (field.type === 'date' && field.future && raw) {
+    const text = String(raw).trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(text) || Number.isNaN(new Date(`${text}T00:00:00Z`).getTime())) throw new MemberError(`${field.label}: use the date picker.`);
+    return text;
+  }
+  return cleanValue(field, raw);
+}
+
+function staffSqlType(field) {
+  if (field.type === 'boolean') return sql.Bit;
+  if (field.type === 'date') return sql.DateTime2(3);
+  return sql.NVarChar(field.max);
+}
+
+/** The editable fields and their current values, read fresh from the database. */
+export async function applicantForEdit(applicantId) {
+  const pool = await getPool();
+  const columns = STAFF_EDIT_FIELDS.map((field) => `[${field.name}]`).join(', ');
+  const found = await pool.request().input('a', sql.Int, applicantId)
+    .query(`SELECT ApplicantID, ${columns} FROM bms.Applicants WHERE ApplicantID = @a`);
+  const row = found.recordset[0];
+  if (!row) throw new MemberError('That person is no longer on the register.', 404);
+  return {
+    applicantId: row.ApplicantID,
+    fields: STAFF_EDIT_FIELDS,
+    values: Object.fromEntries(STAFF_EDIT_FIELDS.map((field) => [field.name, staffValue(field, row[field.name])])),
+  };
+}
+
+/**
+ * Saves staff edits to bms.Applicants. `original` holds the values the editor started from; if
+ * any changed field no longer has that value, someone else changed it meanwhile and nothing is
+ * saved. Adds a dated line to Notes saying who edited what, and audits the old and new values.
+ */
+export async function updateApplicant(staff, applicantId, input) {
+  const changesIn = input?.changes ?? {};
+  const original = input?.original ?? {};
+  const note = input?.note ? String(input.note).trim().slice(0, 1000) : '';
+  const names = Object.keys(changesIn);
+  for (const name of names) if (!STAFF_FIELD.has(name)) throw new MemberError(`${name} cannot be edited here.`);
+  if (!names.length && !note) throw new MemberError('Nothing has changed.');
+
+  const pool = await getPool();
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+  const request = () => new sql.Request(transaction);
+  try {
+    const columns = STAFF_EDIT_FIELDS.map((field) => `[${field.name}]`).join(', ');
+    const found = await request().input('a', sql.Int, applicantId)
+      .query(`SELECT ${columns} FROM bms.Applicants WITH (UPDLOCK) WHERE ApplicantID = @a`);
+    const row = found.recordset[0];
+    if (!row) throw new MemberError('That person is no longer on the register.', 404);
+
+    const changes = {};
+    for (const name of names) {
+      const field = STAFF_FIELD.get(name);
+      const current = staffValue(field, row[name]);
+      if (changesIn[name] === current) continue; // unchanged, even if it is an old value the form would not accept
+      const to = cleanStaffValue(field, changesIn[name]);
+      if (to === current) continue;
+      if (field.required && !to) throw new MemberError(`${field.label} cannot be blank.`);
+      if (!Object.hasOwn(original, name) || original[name] !== current) {
+        throw new MemberError(`Someone else changed ${field.label} while you were editing. Close the editor and open it again to see their change.`, 409);
+      }
+      changes[name] = { from: current, to };
+    }
+    const changed = Object.keys(changes);
+    if (!changed.length && !note) throw new MemberError('Nothing has changed.');
+
+    const today = new Date().toLocaleDateString('en-NZ', { timeZone: 'Pacific/Auckland', day: 'numeric', month: 'short', year: 'numeric' });
+    const what = changed.length ? `Record edited by ${staff.email || staff.name} (${changed.map((name) => STAFF_FIELD.get(name).label).join(', ')}).` : `Note by ${staff.email || staff.name}.`;
+    const line = `${today}: ${what}${note ? ` ${note}` : ''}`;
+
+    const update = request().input('a', sql.Int, applicantId).input('line', sql.NVarChar(sql.MAX), line);
+    const sets = changed.map((name) => {
+      const field = STAFF_FIELD.get(name);
+      const value = changes[name].to;
+      update.input(`f_${name}`, staffSqlType(field), field.type === 'date' && value ? new Date(`${value}T00:00:00Z`) : value);
+      return `[${name}] = @f_${name}`;
+    });
+    if (changes.Inactive) sets.push(changes.Inactive.to ? 'SetInactiveDate = SYSUTCDATETIME()' : 'SetInactiveDate = NULL');
+    sets.push("Notes = CASE WHEN Notes IS NULL OR Notes = '' THEN @line ELSE CONCAT(Notes, CHAR(10), @line) END", 'NoteAddedDate = SYSUTCDATETIME()');
+    await update.query(`UPDATE bms.Applicants SET ${sets.join(', ')} WHERE ApplicantID = @a`);
+    await transaction.commit();
+    await audit(staff, 'applicant.edited', 'bms.Applicants', String(applicantId), { changes, note: note || undefined });
+    return { changed };
+  } catch (error) {
+    await transaction.rollback().catch(() => {});
+    throw error;
+  }
+}
+
+// ---- Members correcting a registration that is still waiting for review ----
+
+export async function updateRegistration(identity, input) {
+  const details = cleanRegistration(input);
+  details.SignInEmail = identity.email;
+  const pool = await getPool();
+  const member = await account(pool, identity);
+  const result = await pool.request()
+    .input('m', sql.Int, member.MemberAccountId)
+    .input('details', sql.NVarChar(sql.MAX), JSON.stringify(details))
+    .query("UPDATE app.MemberRegistrations SET DetailsJson = @details OUTPUT inserted.RegistrationId WHERE MemberAccountId = @m AND Status = 'pending'");
+  if (!result.recordset.length) throw new MemberError('There is no registration waiting for review to change. If yours has already been checked, ask for a change from your details page instead.', 409);
+  await audit(memberActor(identity), 'member.registrationEdited', 'app.MemberRegistrations', String(result.recordset[0].RegistrationId), null);
+}
+
+// ---- Deleting a person's record (Admins only) ----
+
+/**
+ * Rows in other register tables that belong to one person and go with them. Relationship rows
+ * are only the links; the other people in them stay on the register. Attachments are the
+ * register's pointers to files, not the files themselves.
+ */
+const PERSON_ROWS = [
+  { table: 'ApplicantRelationships', label: 'family links', one: 'family link', where: 'ParentApplicantID = @a OR ChildApplicantID = @a' },
+  { table: 'Attachments', label: 'attachments', one: 'attachment', where: 'ApplicantID = @a' },
+  { table: 'Notes', label: 'notes', one: 'note', where: 'ApplicantID = @a' },
+  { table: 'NoteEmails', label: 'saved emails', one: 'saved email', where: 'ApplicantID = @a' },
+  { table: 'FundApplications', label: 'fund applications', one: 'fund application', where: 'ApplicantID = @a' },
+];
+
+async function deletionPlan(request, applicantId, lock) {
+  if (!Number.isInteger(applicantId) || applicantId < 1) throw new MemberError('That person is no longer on the register.', 404);
+  const found = await request().input('a', sql.Int, applicantId)
+    .query(`SELECT * FROM bms.Applicants${lock ? ' WITH (UPDLOCK, HOLDLOCK)' : ''} WHERE ApplicantID = @a`);
+  const person = found.recordset[0];
+  if (!person) throw new MemberError('That person is no longer on the register.', 404);
+  const related = [];
+  for (const item of PERSON_ROWS) {
+    const exists = await request().input('t', sql.NVarChar(200), `bms.${item.table}`).query('SELECT OBJECT_ID(@t) AS id');
+    if (!exists.recordset[0].id) continue;
+    const rows = await request().input('a', sql.Int, applicantId)
+      .query(`SELECT * FROM bms.[${item.table}]${lock ? ' WITH (UPDLOCK, HOLDLOCK)' : ''} WHERE ${item.where}`);
+    related.push({ ...item, rows: rows.recordset });
+  }
+  const login = await request().input('a', sql.Int, applicantId)
+    .query("SELECT MemberAccountId, Email FROM app.MemberAccounts WHERE ApplicantID = @a AND Status = 'linked'");
+  const requests = await request().input('a', sql.Int, applicantId)
+    .query("SELECT COUNT(*) AS n FROM app.ChangeRequests WHERE ApplicantID = @a AND Status = 'pending'");
+  return { person, related, logins: login.recordset, pendingRequests: requests.recordset[0].n };
+}
+
+function personName(person) {
+  return [person.FirstName, person.MiddleNames, person.LastName].map((part) => String(part ?? '').trim()).filter(Boolean).join(' ') || `Person ${person.ApplicantID}`;
+}
+
+/** What deleting this person would remove, for the confirmation screen. */
+export async function deletionSummary(applicantId) {
+  const pool = await getPool();
+  const plan = await deletionPlan(() => pool.request(), applicantId, false);
+  return {
+    applicantId,
+    name: personName(plan.person),
+    related: plan.related.filter((item) => item.rows.length).map((item) => ({ label: item.rows.length === 1 ? item.one : item.label, count: item.rows.length })),
+    memberLogin: plan.logins.map((row) => row.Email).filter(Boolean),
+    pendingRequests: plan.pendingRequests,
+  };
+}
+
+/**
+ * Permanently removes a person and the rows that belong to them, in one transaction. A member
+ * login linked to them is unlinked (they can register again), and their pending change requests
+ * are closed. The audit entry keeps a full copy of every removed row.
+ */
+export async function deleteApplicant(staff, applicantId, input) {
+  if (input?.confirm !== true) throw new MemberError('Confirm the delete first.');
+  const reason = input?.reason ? String(input.reason).trim().slice(0, 1000) : '';
+  const pool = await getPool();
+  const transaction = new sql.Transaction(pool);
+  await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+  const request = () => new sql.Request(transaction);
+  try {
+    const plan = await deletionPlan(request, applicantId, true);
+    for (const item of plan.related) {
+      if (item.rows.length) await request().input('a', sql.Int, applicantId).query(`DELETE FROM bms.[${item.table}] WHERE ${item.where}`);
+    }
+    await request().input('a', sql.Int, applicantId)
+      .query('UPDATE bms.Applicants SET AddressLockedToApplicantID = NULL WHERE AddressLockedToApplicantID = @a');
+    await request().input('a', sql.Int, applicantId).query('DELETE FROM bms.Applicants WHERE ApplicantID = @a');
+    await request().input('a', sql.Int, applicantId)
+      .query("UPDATE app.MemberAccounts SET ApplicantID = NULL, Status = 'pending', LinkedBy = NULL, LinkedAt = NULL WHERE ApplicantID = @a AND Status = 'linked'");
+    await request().input('a', sql.Int, applicantId).input('by', sql.NVarChar(200), staff.email || staff.name)
+      .query("UPDATE app.ChangeRequests SET Status = 'rejected', ReviewedBy = @by, ReviewedAt = SYSUTCDATETIME(), ReviewNote = 'The record was removed from the register.' WHERE ApplicantID = @a AND Status = 'pending'");
+    await transaction.commit();
+    await audit(staff, 'applicant.deleted', 'bms.Applicants', String(applicantId), {
+      name: personName(plan.person),
+      reason: reason || undefined,
+      unlinkedLogins: plan.logins.map((row) => row.MemberAccountId),
+      closedRequests: plan.pendingRequests,
+      removed: { Applicants: [plan.person], ...Object.fromEntries(plan.related.filter((item) => item.rows.length).map((item) => [item.table, item.rows])) },
+    });
+    return { deleted: applicantId };
   } catch (error) {
     await transaction.rollback().catch(() => {});
     throw error;
